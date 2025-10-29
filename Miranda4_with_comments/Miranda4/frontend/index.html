@@ -1,0 +1,60 @@
+<!DOCTYPE html><!-- Declare this document to be HTML5 -->
+<html lang="en"><!-- Set the language of the page to English -->
+<head>
+  <!-- Define the character encoding for the document.  UTF-8 covers almost all characters -->
+  <meta charset="UTF-8" />
+  
+  <!-- Ensure the page scales correctly on mobile devices by controlling the viewport -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <!-- The title appears in the browser tab and bookmarks -->
+  <title>Miranda4</title>
+  
+  <!-- Link to the external stylesheet that defines the look and feel of the chat UI -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- The outer container for the chat interface.  It sets the size and
+       position of the chat box and enables resizing (see style.css). -->
+  <div class="chat-container">
+    
+    <!-- Header bar displaying the name of the assistant -->
+    <div class="chat-header">Miranda4</div>
+    
+    <!-- Scrollable area where chat messages are appended.  The id is used
+         by app.js to find this element and insert messages. -->
+    <div class="chat-window" id="chatWindow"></div>
+
+    <!-- Form containing the input field and send button.  Submitting the
+         form triggers the JavaScript event handler in app.js.  We disable
+         autocomplete so previous messages don't appear in the dropdown. -->
+    <form id="chatForm" class="input-container" autocomplete="off">
+      
+      <!-- Single-line text input for the user’s message.  The ``placeholder``
+           shows grey hint text when the field is empty.  ``aria-label``
+           improves screen reader accessibility.  ``autofocus`` puts the
+           cursor here when the page loads.  ``required`` prevents
+           submission of empty messages via Enter. -->
+      <input
+        type="text"
+        id="userInput"
+        placeholder="Type your message…"
+        aria-label="Message input"
+        autofocus
+        required
+      />
+
+      <!-- Button to submit the form.  The ``type="submit"`` attribute
+           triggers the form's submit event when clicked or when the
+           Enter key is pressed in the input field. -->
+      <button type="submit" class="send-button">Send</button>
+    </form>
+
+  </div>
+
+  <!-- Include the JavaScript file that powers the chat UI.  The ``defer``
+       attribute ensures the script executes after the HTML has been
+       parsed, so that DOM elements referenced in app.js exist. -->
+  <script src="app.js" defer></script>
+</body>
+</html>
