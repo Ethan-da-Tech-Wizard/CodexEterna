@@ -1,0 +1,33 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- ADDED: viewport for proper sizing -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Miranda4</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">Miranda4</div>
+    <div class="chat-window" id="chatWindow"></div>
+
+    <!-- MODIFIED: replaced invalid "..." with real attributes; kept ids/classes intact -->
+    <form id="chatForm" class="input-container" autocomplete="off">
+      <input
+        type="text"
+        id="userInput"
+        placeholder="Type your message…"
+        aria-label="Message input"
+        autofocus
+        required
+      />
+      <button type="submit" class="send-button">Send</button>
+    </form>
+
+  </div>
+
+  <!-- ADDED: defer ensures DOM is ready before app.js runs -->
+  <script src="app.js" defer></script>
+</body>
+</html>
