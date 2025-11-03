@@ -42,6 +42,9 @@ The UI features a beautiful **Gold, Purple, White, and Pink** color palette for 
 - **Object Detection**: Identify objects/features using DETR
 - **Change Detection**: Compare images using Structural Similarity Index (SSIM)
 - **Detailed Reports**: Comprehensive analysis of differences between images
+- **🆕 API Fetching**: Fetch satellite images directly from free APIs (NASA, Sentinel Hub, Mapbox)
+- **🆕 Temporal Analysis**: Dedicated change detection mode with specialized AI system prompt
+- **🆕 Example Locations**: Pre-configured locations showing real-world changes
 
 ### 💬 Conversational AI
 - Context-aware conversations using LangChain
@@ -173,8 +176,11 @@ python -c "import langchain, chromadb, transformers, cv2, gradio; print('✅ All
 ### Command Line Options
 
 ```bash
-# Use lightweight simple agent (default, faster, less RAM)
+# Standard UI (manual image upload only)
 python app.py
+
+# 🆕 Enhanced UI with satellite image fetching (RECOMMENDED)
+python app.py --enhanced
 
 # Use full LLM agent (more advanced, requires more resources)
 python app.py --full-llm
@@ -185,8 +191,8 @@ python app.py --port 8080
 # Create public share link
 python app.py --share
 
-# Combine options
-python app.py --full-llm --port 8080
+# Combine options - Enhanced UI with full LLM
+python app.py --enhanced --full-llm --port 8080
 ```
 
 ### Using the Application
@@ -206,6 +212,34 @@ python app.py --full-llm --port 8080
    - "Compare Pikachu and Raichu"
 
 #### 2️⃣ Satellite Image Analysis
+
+**🆕 Option A: Fetch from API (Enhanced Mode)**
+
+1. **Launch enhanced UI**:
+   ```bash
+   python app.py --enhanced
+   ```
+
+2. **Go to "🛰️ Satellite Image Analysis" tab**
+
+3. **Quick start with examples** OR **enter custom coordinates**:
+   - Select example: "Dubai (Urban Development)"
+   - Or enter latitude/longitude manually
+
+4. **Set date range**:
+   - Before Date: e.g., `2015-01-01`
+   - After Date: e.g., `2023-01-01`
+
+5. **Choose API source**:
+   - **NASA** (no setup needed, completely free!)
+   - **Sentinel Hub** (requires free account - [setup guide](SATELLITE_API_SETUP.md))
+   - **Mapbox** (requires free account - [setup guide](SATELLITE_API_SETUP.md))
+
+6. **Click "Fetch Satellite Images"**
+
+7. **Click "Run Change Detection Analysis"** for automated comprehensive report!
+
+**Option B: Manual Upload (Standard Mode)**
 
 1. **Upload two images**:
    - Image 1 (Before): Upload your first/earlier image
