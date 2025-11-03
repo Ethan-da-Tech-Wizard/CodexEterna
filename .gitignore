@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Project specific
+vectordb/
+logs/
+*.log
+data/images/*.png
+data/images/*.jpg
+data/images/*.jpeg
+
+# Model cache
+.cache/
+*.model
+*.bin
+
+# Environment variables
+.env
+.env.local
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# User uploaded files (keep sample data)
+data/pokemon/*.csv
+!data/pokemon/sample_pokemon.csv
+data/images/*
+!data/images/.gitkeep
