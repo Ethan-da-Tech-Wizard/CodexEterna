@@ -1,0 +1,30 @@
+# Core LLM and LangChain dependencies
+langchain>=0.1.0
+langchain-community>=0.0.10
+transformers>=4.35.0
+torch>=2.1.0
+accelerate>=0.25.0
+bitsandbytes>=0.41.0
+sentence-transformers>=2.2.2
+
+# Vector stores
+chromadb>=0.4.0
+faiss-cpu>=1.7.4
+
+# Image processing
+Pillow>=10.0.0
+opencv-python>=4.8.0
+scikit-image>=0.22.0
+
+# UI framework
+gradio>=4.0.0
+
+# Data handling
+pandas>=2.0.0
+openpyxl>=3.1.0
+numpy>=1.24.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+requests>=2.31.0
