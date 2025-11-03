@@ -8,9 +8,43 @@
 
 **An interactive AI application combining RAG-powered Pokémon Q&A with satellite image change detection**
 
-[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Architecture](#-architecture) • [Contributing](#-contributing)
+[Quick Start](#-quick-start-2-minutes) • [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Submit Pokemon](#-submit-your-own-pokemon-data)
 
 </div>
+
+---
+
+## ⚡ QUICK START (2 Minutes!)
+
+**Want to start immediately? Use the Simple Version!**
+
+### Step 1: Open in VS Code
+```bash
+# Clone the repo if you haven't
+git clone https://github.com/Ethan-da-Tech-Wizard/CodexEterna.git
+cd CodexEterna
+```
+
+### Step 2: Run the Simple App
+```bash
+python simple_app.py
+```
+
+### Step 3: Open Browser
+Go to: **http://localhost:8000**
+
+**That's it! No dependencies needed!** ✨
+
+The simple version includes:
+- ✅ Browse & search Pokemon data
+- ✅ Submit your own Pokemon
+- ✅ Upload CSV files
+- ✅ Beautiful web interface
+- ✅ Works immediately with zero setup
+
+**Want AI features?** See the [Full Installation Guide](#-installation) below for image analysis and natural language chat!
+
+📖 **Detailed Instructions:** See [QUICKSTART.md](QUICKSTART.md) for VS Code setup guide
 
 ---
 
@@ -155,7 +189,25 @@ python -c "import langchain, chromadb, transformers, cv2, gradio; print('✅ All
 
 ## 🚀 Usage
 
-### Quick Start
+### Simple Version (Recommended for Quick Start)
+
+**No installation required! Works immediately!**
+
+```bash
+python simple_app.py
+```
+
+Then open: **http://localhost:8000**
+
+Features:
+- Browse and search Pokemon
+- Submit custom Pokemon
+- Upload CSV files
+- View satellite images
+
+### Advanced Version (Full AI Features)
+
+**Requires installation of dependencies (see Installation section above)**
 
 1. **Activate your virtual environment** (if not already active):
    ```bash
@@ -199,6 +251,12 @@ python app.py --enhanced --full-llm --port 8080
 
 #### 1️⃣ Pokémon Data Q&A
 
+**Simple Version:**
+1. Click "Load All Pokemon" to browse the database
+2. Use the search bar to find specific Pokemon
+3. Sample data loads automatically from `data/pokemon/sample_pokemon.csv`
+
+**Advanced Version:**
 1. **Upload your Pokémon dataset** (CSV or Excel format)
    - A sample dataset is included in `data/pokemon/sample_pokemon.csv`
    - Format should include columns like: Name, Type1, Type2, HP, Attack, Defense, etc.
@@ -265,6 +323,40 @@ AI: "The first image shows a suburban area with..."
 You: "Compare that to the second image"
 AI: "Comparing the images, I notice several changes..."
 ```
+
+---
+
+## 🎮 Submit Your Own Pokemon Data
+
+You can easily add custom Pokemon to the database! There are multiple ways:
+
+### Method 1: Web Form (Easiest)
+
+1. Open the app (simple or advanced version)
+2. Go to **"Submit Pokemon"** tab
+3. Fill in the form with:
+   - Pokemon name
+   - Primary and secondary types
+   - Stats (HP, Attack, Defense, Special Attack, Special Defense, Speed)
+4. Click "Submit Pokemon"
+
+### Method 2: Upload CSV File
+
+Create a CSV file with this format:
+
+```csv
+Name,Type1,Type2,HP,Attack,Defense,Sp_Atk,Sp_Def,Speed
+Thunderflare,Electric,Dragon,85,120,75,145,90,110
+Aquafrost,Water,Ice,90,75,110,95,115,65
+```
+
+Then upload it through the **"Submit Pokemon"** tab!
+
+### Method 3: Edit CSV Directly
+
+Edit `data/pokemon/sample_pokemon.csv` or create `data/pokemon/user_submitted.csv`
+
+**📖 Detailed Guide:** See [HOW_TO_SUBMIT_POKEMON.md](HOW_TO_SUBMIT_POKEMON.md) for complete instructions with examples!
 
 ---
 
