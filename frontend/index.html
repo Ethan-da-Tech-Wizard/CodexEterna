@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮🛰️ Pokemon & Satellite Image Tool</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🎮🛰️ Pokemon & Satellite Image Tool</h1>
+            <p class="subtitle">Upload Pokemon data, fetch satellite images, and detect changes over time!</p>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('pokemon')">🎮 Pokemon Data</button>
+            <button class="tab-btn" onclick="showTab('satellite')">🛰️ Satellite Images</button>
+            <button class="tab-btn" onclick="showTab('compare')">🔍 Image Comparison</button>
+        </div>
+
+        <!-- Pokemon Tab -->
+        <div id="pokemon-tab" class="tab-content active">
+            <div class="card">
+                <h2>📊 Upload Pokemon Dataset</h2>
+                <p>Upload a CSV or Excel file with Pokemon data</p>
+
+                <div class="upload-area">
+                    <input type="file" id="pokemon-file" accept=".csv,.xlsx,.xls">
+                    <button onclick="uploadPokemon()" class="btn btn-primary">Upload Pokemon Data</button>
+                </div>
+
+                <div id="pokemon-status" class="status-message"></div>
+
+                <div class="search-section">
+                    <h3>🔍 Search Pokemon</h3>
+                    <input type="text" id="pokemon-search" placeholder="Search by name, type, stats..." />
+                    <button onclick="searchPokemon()" class="btn btn-secondary">Search</button>
+                </div>
+
+                <div id="pokemon-results" class="results"></div>
+            </div>
+        </div>
+
+        <!-- Satellite Tab -->
+        <div id="satellite-tab" class="tab-content">
+            <div class="card">
+                <h2>🛰️ Fetch Satellite Images</h2>
+                <p>Get FREE satellite images from NASA (no API key needed!)</p>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>📍 Location</label>
+                        <select id="location-select" onchange="loadLocation()">
+                            <option value="">Select Example...</option>
+                            <option value="dubai">Dubai (Urban Development)</option>
+                            <option value="amazon">Amazon Rainforest (Deforestation)</option>
+                            <option value="vegas">Las Vegas (Urban Expansion)</option>
+                            <option value="aral">Aral Sea (Water Loss)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Latitude</label>
+                        <input type="number" id="latitude" value="25.2048" step="0.0001">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Longitude</label>
+                        <input type="number" id="longitude" value="55.2708" step="0.0001">
+                    </div>
+
+                    <div class="form-group">
+                        <label>📅 Before Date</label>
+                        <input type="date" id="date-before" value="2015-01-01">
+                    </div>
+
+                    <div class="form-group">
+                        <label>📅 After Date</label>
+                        <input type="date" id="date-after" value="2023-01-01">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="fetchSatelliteImage('before')" class="btn btn-primary">
+                        📥 Fetch Before Image
+                    </button>
+                    <button onclick="fetchSatelliteImage('after')" class="btn btn-primary">
+                        📥 Fetch After Image
+                    </button>
+                </div>
+
+                <div id="satellite-status" class="status-message"></div>
+
+                <div class="image-preview-grid">
+                    <div class="preview-box">
+                        <h3>Before Image</h3>
+                        <div id="before-preview" class="image-placeholder">
+                            No image loaded
+                        </div>
+                    </div>
+                    <div class="preview-box">
+                        <h3>After Image</h3>
+                        <div id="after-preview" class="image-placeholder">
+                            No image loaded
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compare Tab -->
+        <div id="compare-tab" class="tab-content">
+            <div class="card">
+                <h2>🔍 Image Comparison & Change Detection</h2>
+                <p>Upload or use fetched images to detect changes over time</p>
+
+                <div class="upload-section">
+                    <div class="upload-box">
+                        <h3>Upload Before Image</h3>
+                        <input type="file" id="upload-before" accept="image/*" onchange="uploadImage('before')">
+                    </div>
+                    <div class="upload-box">
+                        <h3>Upload After Image</h3>
+                        <input type="file" id="upload-after" accept="image/*" onchange="uploadImage('after')">
+                    </div>
+                </div>
+
+                <button onclick="compareImages()" class="btn btn-large btn-primary">
+                    🔍 Compare Images & Detect Changes
+                </button>
+
+                <div id="comparison-status" class="status-message"></div>
+
+                <div id="comparison-results" class="comparison-results"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>Built with ❤️ using Python Flask + HTML/CSS/JavaScript</p>
+            <p>🆓 100% Free & Open Source • No API Keys Required (NASA GIBS)</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
