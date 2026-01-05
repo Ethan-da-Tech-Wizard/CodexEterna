@@ -77,6 +77,72 @@ public class PingController : ControllerBase
     }
 
     /// <summary>
+    /// Get filtered coordinates with advanced filtering options
+    /// </summary>
+    [HttpGet("filter")]
+    public ActionResult<IEnumerable<CoordinatePing>> GetFilteredCoordinates(
+        [FromQuery] double? minLat = null,
+        [FromQuery] double? maxLat = null,
+        [FromQuery] double? minLon = null,
+        [FromQuery] double? maxLon = null,
+        [FromQuery] long? minCount = null,
+        [FromQuery] long? maxCount = null,
+        [FromQuery] int? lastSeenMinutes = null,
+        [FromQuery] string? hemisphere = null,
+        [FromQuery] string sortBy = "count",
+        [FromQuery] bool ascending = false,
+        [FromQuery] int limit = 100)
+    {
+        if (limit < 1 || limit > 10000)
+            return BadRequest("Limit must be between 1 and 10000");
+
+        var results = _pingService.GetFilteredCoordinates(
+            minLat, maxLat, minLon, maxLon, minCount, maxCount,
+            lastSeenMinutes, hemisphere, sortBy, ascending, limit);
+
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Get coordinates by geographic region
+    /// </summary>
+    [HttpGet("region/{regionName}")]
+    public ActionResult<IEnumerable<CoordinatePing>> GetCoordinatesByRegion(
+        string regionName,
+        [FromQuery] int limit = 100)
+    {
+        if (limit < 1 || limit > 10000)
+            return BadRequest("Limit must be between 1 and 10000");
+
+        var validRegions = new[] { "north_america", "south_america", "europe", "africa", "asia", "oceania" };
+        if (!validRegions.Contains(regionName.ToLower()))
+            return BadRequest($"Invalid region. Valid regions: {string.Join(", ", validRegions)}");
+
+        var results = _pingService.GetCoordinatesByRegion(regionName, limit);
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Get aggregate statistics grouped by different dimensions
+    /// </summary>
+    [HttpGet("aggregate")]
+    public ActionResult<Dictionary<string, object>> GetAggregateStats(
+        [FromQuery] string groupBy = "hemisphere")
+    {
+        var validGroupings = new[] { "hemisphere", "quadrant", "count_range" };
+        if (!validGroupings.Contains(groupBy.ToLower()))
+            return BadRequest($"Invalid groupBy. Valid options: {string.Join(", ", validGroupings)}");
+
+        var stats = _pingService.GetAggregateStats(groupBy);
+        return Ok(new
+        {
+            groupBy = groupBy,
+            stats = stats,
+            timestamp = DateTime.UtcNow
+        });
+    }
+
+    /// <summary>
     /// Pause ping generation
     /// </summary>
     [HttpPost("pause")]

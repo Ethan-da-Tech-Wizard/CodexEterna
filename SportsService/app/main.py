@@ -226,6 +226,174 @@ async def get_game(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve game: {str(e)}")
 
 
+@app.get("/api/sports/filter", response_model=List[GameResponse])
+async def get_filtered_games(
+    league: Optional[str] = Query(None, description="Filter by league"),
+    status: Optional[str] = Query(None, description="Filter by game status"),
+    is_final: Optional[bool] = Query(None, description="Filter by final/live games"),
+    min_score: Optional[int] = Query(None, description="Minimum total score"),
+    max_score: Optional[int] = Query(None, description="Maximum total score"),
+    close_game_threshold: Optional[int] = Query(None, description="Show only close games (max score diff)"),
+    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    venue: Optional[str] = Query(None, description="Filter by venue name"),
+    home_team: Optional[str] = Query(None, description="Filter by home team"),
+    away_team: Optional[str] = Query(None, description="Filter by away team"),
+    sort_by: str = Query("date", description="Sort by: date, home_score, away_score, total_score, score_diff"),
+    ascending: bool = Query(False, description="Sort ascending (default: descending)"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of games"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get games with comprehensive filtering options
+
+    Filter games by multiple criteria including league, status, scores, dates, and teams.
+    Sort results by various fields in ascending or descending order.
+    """
+    try:
+        # Parse dates if provided
+        date_from_obj = None
+        date_to_obj = None
+
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_from format. Use YYYY-MM-DD")
+
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_to format. Use YYYY-MM-DD")
+
+        games = game_service.get_filtered_games(
+            db=db,
+            league=league,
+            status=status,
+            is_final=is_final,
+            min_score=min_score,
+            max_score=max_score,
+            close_game_threshold=close_game_threshold,
+            date_from=date_from_obj,
+            date_to=date_to_obj,
+            venue=venue,
+            home_team=home_team,
+            away_team=away_team,
+            sort_by=sort_by,
+            ascending=ascending,
+            limit=limit
+        )
+
+        logger.info(f"Retrieved {len(games)} filtered games")
+        return games
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error filtering games: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to filter games: {str(e)}")
+
+
+@app.get("/api/sports/high-scoring", response_model=List[GameResponse])
+async def get_high_scoring_games(
+    threshold: int = Query(100, ge=50, le=300, description="Minimum total score"),
+    league: Optional[str] = Query(None, description="Filter by league"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of games"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get high-scoring games above a threshold
+
+    Shows games with combined scores exceeding the specified threshold.
+    Sorted by total score (highest first).
+    """
+    try:
+        games = game_service.get_high_scoring_games(db, threshold, league, limit)
+        logger.info(f"Retrieved {len(games)} high-scoring games")
+        return games
+    except Exception as e:
+        logger.error(f"Error retrieving high-scoring games: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve high-scoring games: {str(e)}")
+
+
+@app.get("/api/sports/close-games", response_model=List[GameResponse])
+async def get_close_games(
+    max_diff: int = Query(5, ge=1, le=20, description="Maximum score difference"),
+    league: Optional[str] = Query(None, description="Filter by league"),
+    limit: int = Query(50, ge=1, le=500, description="Maximum number of games"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get close games with small score differences
+
+    Shows games where the final score difference is within the specified threshold.
+    Sorted by score difference (closest games first).
+    """
+    try:
+        games = game_service.get_close_games(db, max_diff, league, limit)
+        logger.info(f"Retrieved {len(games)} close games")
+        return games
+    except Exception as e:
+        logger.error(f"Error retrieving close games: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve close games: {str(e)}")
+
+
+@app.get("/api/sports/by-status", response_model=List[GameResponse])
+async def get_games_by_status(
+    status: str = Query(..., description="Status to filter by (e.g., 'Final', 'Live', 'Q4')"),
+    league: Optional[str] = Query(None, description="Filter by league"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of games"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get games by their status
+
+    Filter games by status: Final, Live, Scheduled, Quarter/Period, etc.
+    """
+    try:
+        games = game_service.get_games_by_status(db, status, league, limit)
+        logger.info(f"Retrieved {len(games)} games with status: {status}")
+        return games
+    except Exception as e:
+        logger.error(f"Error retrieving games by status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve games by status: {str(e)}")
+
+
+@app.get("/api/sports/aggregate")
+async def get_aggregate_statistics(
+    group_by: str = Query("league", description="Group by: league, status, final, date"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get aggregate statistics grouped by various dimensions
+
+    - league: Count of games per league
+    - status: Count of games per status
+    - final: Count of final vs live games
+    - date: Count of games per date (last 7 days)
+    """
+    try:
+        valid_groupings = ["league", "status", "final", "date"]
+        if group_by not in valid_groupings:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid group_by. Valid options: {', '.join(valid_groupings)}"
+            )
+
+        stats = game_service.get_aggregate_stats(db, group_by)
+        return {
+            "group_by": group_by,
+            "stats": stats,
+            "timestamp": datetime.utcnow()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting aggregate stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get aggregate stats: {str(e)}")
+
+
 @app.get("/api/sports/leagues")
 async def get_supported_leagues():
     """
