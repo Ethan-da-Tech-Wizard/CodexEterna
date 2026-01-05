@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Sports Data
+  sportsdb:
+    image: postgres:15-alpine
+    container_name: sportsdb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: sportsdata
+    volumes:
+      - sportsdb_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - data-pipeline-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Python Sports Data Service
+  sportsservice:
+    build:
+      context: ./SportsService
+      dockerfile: Dockerfile
+    container_name: sportsservice
+    environment:
+      DATABASE_URL: postgresql://postgres:secret@sportsdb:5432/sportsdata
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "5001:5001"
+    depends_on:
+      sportsdb:
+        condition: service_healthy
+    networks:
+      - data-pipeline-network
+    restart: unless-stopped
+    volumes:
+      - ./SportsService:/app:ro
+
+  # C# Coordinate Ping Service
+  pingservice:
+    build:
+      context: ./PingService
+      dockerfile: Dockerfile
+    container_name: pingservice
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5000
+    ports:
+      - "5000:5000"
+    networks:
+      - data-pipeline-network
+    restart: unless-stopped
+    depends_on:
+      - sportsservice
+
+networks:
+  data-pipeline-network:
+    driver: bridge
+    name: data-pipeline-network
+
+volumes:
+  sportsdb_data:
+    name: sportsdb_data
