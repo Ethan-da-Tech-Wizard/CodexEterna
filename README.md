@@ -2,6 +2,28 @@
 
 A production-ready hybrid C# and Python microservices system demonstrating high-throughput real-time data processing, WebSocket communication, and modern cloud-native architecture.
 
+---
+
+## 🚨 NEW USER? START HERE! 🚨
+
+**👉 [START_HERE.md](START_HERE.md) - Ultra-simple setup guide (5 minutes)**
+
+**Too long, didn't read:**
+```bash
+# 1. Install Docker Desktop from docker.com
+# 2. Download this project as ZIP or clone it
+# 3. Open terminal in the CodexEterna folder
+# 4. Run this:
+docker-compose up --build
+# 5. Open browser to: http://localhost:5000
+```
+
+**Other Guides:**
+- [QUICKSTART.md](QUICKSTART.md) - Fast setup for experienced users
+- [DEMO_GUIDE.md](DEMO_GUIDE.md) - Complete demo walkthrough
+
+---
+
 ## 🚀 Features
 
 - **High-Throughput Coordinate Tracking**: Generates and processes 20,000 GPS coordinate pings per second
