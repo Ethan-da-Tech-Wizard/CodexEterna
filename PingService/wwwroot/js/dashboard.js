@@ -322,39 +322,8 @@ function displaySearchResults(results) {
 }
 
 // ============================================================================
-// Sports Data Functions
+// Sports Data Functions (see implementation further below with ESPN fallback)
 // ============================================================================
-
-async function fetchSportsData() {
-    const sportSelect = document.getElementById('sportSelect');
-    const sport = sportSelect.value;
-
-    if (!sport) {
-        alert('Please select a sport');
-        return;
-    }
-
-    const sportsData = document.getElementById('sportsData');
-    sportsData.innerHTML = '<div class="no-data"><div class="spinner"></div> Fetching data...</div>';
-
-    try {
-        const response = await fetch(`${SPORTS_SERVICE_URL}/api/sports/fetch?league=${sport}`);
-
-        if (response.ok) {
-            const data = await response.json();
-            console.log('Sports data fetched:', data);
-
-            // Load and display the fetched games
-            await loadStoredGames();
-        } else {
-            sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Failed to fetch sports data. Make sure the Sports Service is running.</div>';
-            console.error('Failed to fetch sports data:', response.statusText);
-        }
-    } catch (error) {
-        sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Error: Could not connect to Sports Service</div>';
-        console.error('Error fetching sports data:', error);
-    }
-}
 
 async function loadStoredGames() {
     const sportSelect = document.getElementById('sportSelect');
@@ -990,12 +959,25 @@ async function startPingSystem() {
         const data = await response.json();
 
         if (response.ok) {
+            // Enable client-side ping generation
+            isPaused = false;
+            startPingGenerator();
+
+            // Update UI
             document.getElementById('startPingBtn').disabled = true;
             document.getElementById('stopPingBtn').disabled = false;
             document.getElementById('pauseBtn').disabled = false;
             document.getElementById('pingWarning').style.display = 'block';
-            alert('✅ ' + data.message);
-            console.log('Ping system started:', data);
+
+            // Update status indicator
+            const statusDot = document.querySelector('#pingStatus .status-dot');
+            const statusText = document.querySelector('#pingStatus .status-text');
+            statusDot.classList.add('running');
+            statusText.textContent = 'Running';
+
+            document.getElementById('sessionStatus').textContent = 'Active';
+
+            console.log('✅ Ping system started - generating coordinates');
         } else {
             alert('❌ Error: ' + data.message);
         }
@@ -1015,12 +997,28 @@ async function stopPingSystem() {
         const data = await response.json();
 
         if (response.ok) {
+            // Stop client-side generation
+            isPaused = true;
+            if (pingGeneratorInterval) {
+                clearInterval(pingGeneratorInterval);
+                pingGeneratorInterval = null;
+            }
+
+            // Update UI
             document.getElementById('startPingBtn').disabled = false;
             document.getElementById('stopPingBtn').disabled = true;
             document.getElementById('pauseBtn').disabled = true;
             document.getElementById('pingWarning').style.display = 'none';
-            alert('✅ ' + data.message);
-            console.log('Ping system stopped:', data);
+
+            // Update status indicator
+            const statusDot = document.querySelector('#pingStatus .status-dot');
+            const statusText = document.querySelector('#pingStatus .status-text');
+            statusDot.classList.remove('running');
+            statusText.textContent = 'Stopped';
+
+            document.getElementById('sessionStatus').textContent = 'Stopped';
+
+            console.log('✅ Ping system stopped');
         } else {
             alert('❌ Error: ' + data.message);
         }
