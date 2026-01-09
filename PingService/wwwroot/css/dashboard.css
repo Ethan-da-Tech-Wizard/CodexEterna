@@ -1003,3 +1003,267 @@ body {
     transition: none !important;
     animation: none !important;
 }
+
+/* ============================================================================
+   Stock Exchange / Crypto Trading Styles
+   ============================================================================ */
+
+/* Crypto Ticker Display */
+.crypto-ticker {
+    background: linear-gradient(135deg, rgba(30, 35, 50, 0.95), rgba(20, 25, 40, 0.95));
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    position: relative;
+    overflow: hidden;
+}
+
+.crypto-ticker::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--success-color), var(--primary-color));
+}
+
+.ticker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.ticker-symbol {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.ticker-symbol h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    font-family: var(--font-mono);
+}
+
+.ticker-symbol .exchange-badge {
+    background: rgba(91, 155, 213, 0.2);
+    color: var(--primary-color);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.ticker-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.ticker-status .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-color);
+    animation: pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--success-color);
+}
+
+/* Main Price Display */
+.price-display {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.price-main {
+    font-size: 3.5rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    line-height: 1;
+    letter-spacing: -1px;
+}
+
+.price-currency {
+    font-size: 1.8rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* Price Change Indicators */
+.price-change {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.change-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.change-value.positive {
+    background: rgba(112, 173, 71, 0.15);
+    color: #70ad47;
+}
+
+.change-value.negative {
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+}
+
+.change-arrow {
+    font-size: 1rem;
+}
+
+.change-percent {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* Mini Stats Grid for Crypto */
+.crypto-mini-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid rgba(91, 155, 213, 0.15);
+}
+
+.mini-stat {
+    text-align: left;
+}
+
+.mini-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.mini-stat-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.mini-stat-value.high {
+    color: var(--success-color);
+}
+
+.mini-stat-value.low {
+    color: var(--danger-color);
+}
+
+/* Snapshot Cards */
+.snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.snapshot-card {
+    background: linear-gradient(135deg, rgba(40, 44, 60, 0.9), rgba(30, 34, 50, 0.9));
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: var(--spacing-md);
+    transition: all var(--transition-speed);
+}
+
+.snapshot-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 24px var(--shadow-color);
+}
+
+.snapshot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid rgba(91, 155, 213, 0.1);
+}
+
+.snapshot-time {
+    font-size: 0.75rem;
+    color: var(--primary-color);
+    font-weight: 600;
+    font-family: var(--font-mono);
+}
+
+.snapshot-date {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.snapshot-price {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    margin-bottom: var(--spacing-xs);
+}
+
+.snapshot-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+    font-size: 0.8rem;
+}
+
+.snapshot-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.snapshot-detail-label {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.snapshot-detail-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-family: var(--font-mono);
+}
+
+/* Warning/Info Boxes */
+.warning-box,
+.info-box {
+    border-radius: 8px;
+    margin-bottom: var(--spacing-md);
+}
+
+/* Last Update Timestamp */
+.last-update {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-top: var(--spacing-xs);
+    font-style: italic;
+}
