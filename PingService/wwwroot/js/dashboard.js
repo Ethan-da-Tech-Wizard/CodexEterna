@@ -1099,9 +1099,13 @@ async function stopCryptoSystem() {
 // ============================================================================
 
 let cryptoPriceInterval = null;
+let previousPrice = null;
 
 function startCryptoPricePolling() {
     if (cryptoPriceInterval) clearInterval(cryptoPriceInterval);
+
+    // Show LIVE indicator
+    document.getElementById('tickerStatus').style.display = 'flex';
 
     cryptoPriceInterval = setInterval(async () => {
         try {
@@ -1121,13 +1125,58 @@ function stopCryptoPricePolling() {
         clearInterval(cryptoPriceInterval);
         cryptoPriceInterval = null;
     }
+    // Hide LIVE indicator
+    document.getElementById('tickerStatus').style.display = 'none';
+    previousPrice = null;
 }
 
 function updateCryptoStats(stats) {
-    document.getElementById('cryptoPrice').textContent = '$' + stats.currentPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const currentPrice = stats.currentPrice;
+
+    // Update main price display (no $ symbol in HTML, it's shown separately)
+    document.getElementById('cryptoPrice').textContent = currentPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    // Calculate price change
+    if (previousPrice !== null && previousPrice !== 0) {
+        const priceChange = currentPrice - previousPrice;
+        const percentChange = ((priceChange / previousPrice) * 100);
+
+        const changeElement = document.getElementById('priceChange');
+        const changeAmount = document.getElementById('changeAmount');
+        const changePercent = document.getElementById('changePercent');
+        const arrow = changeElement.querySelector('.change-arrow');
+
+        // Update values
+        changeAmount.textContent = '$' + Math.abs(priceChange).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        changePercent.textContent = '(' + Math.abs(percentChange).toFixed(2) + '%)';
+
+        // Update styling based on positive/negative
+        if (priceChange > 0) {
+            changeElement.classList.remove('negative');
+            changeElement.classList.add('positive');
+            arrow.textContent = '▲';
+        } else if (priceChange < 0) {
+            changeElement.classList.remove('positive');
+            changeElement.classList.add('negative');
+            arrow.textContent = '▼';
+        } else {
+            changeElement.classList.remove('positive', 'negative');
+            arrow.textContent = '—';
+        }
+    }
+
+    // Update mini stats
     document.getElementById('cryptoHigh').textContent = '$' + stats.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('cryptoLow').textContent = '$' + stats.lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('cryptoVolume').textContent = stats.totalTrades ? stats.totalTrades.toLocaleString() : '0';
     document.getElementById('cryptoSnapshots').textContent = stats.totalSnapshots;
+
+    // Update last update timestamp
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent = 'Last update: ' + now.toLocaleTimeString();
+
+    // Store current price for next comparison
+    previousPrice = currentPrice;
 }
 
 async function loadCryptoSnapshots() {
@@ -1149,24 +1198,50 @@ function displayCryptoSnapshots(snapshots) {
     const cryptoData = document.getElementById('cryptoData');
 
     if (!snapshots || snapshots.length === 0) {
-        cryptoData.innerHTML = '<div class="no-data">No snapshots available yet. Start monitoring to begin collecting data.</div>';
+        cryptoData.innerHTML = '<div class="no-data">No snapshots available yet. Start monitoring to begin collecting data.<br>Snapshots are automatically saved every 10 minutes.</div>';
         return;
     }
 
-    const html = snapshots.map(snapshot => `
-        <div class="game-card">
-            <div class="game-teams">
-                <span>🕐 ${new Date(snapshot.timestamp).toLocaleString()}</span>
-                <span class="game-score">$${snapshot.price.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-                <span>${snapshot.symbol}</span>
-            </div>
-            <div class="game-status">
-                High: $${snapshot.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2})} |
-                Low: $${snapshot.lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2})} |
-                Trades: ${snapshot.totalTrades.toLocaleString()}
-            </div>
+    // Create snapshot grid
+    const html = `
+        <div class="snapshot-grid">
+            ${snapshots.map(snapshot => {
+                const date = new Date(snapshot.timestamp);
+                const timeString = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateString = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                return `
+                    <div class="snapshot-card">
+                        <div class="snapshot-header">
+                            <div class="snapshot-time">${timeString}</div>
+                            <div class="snapshot-date">${dateString}</div>
+                        </div>
+                        <div class="snapshot-price">
+                            $${snapshot.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                        </div>
+                        <div class="snapshot-details">
+                            <div class="snapshot-detail">
+                                <div class="snapshot-detail-label">High</div>
+                                <div class="snapshot-detail-value">$${snapshot.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                            </div>
+                            <div class="snapshot-detail">
+                                <div class="snapshot-detail-label">Low</div>
+                                <div class="snapshot-detail-value">$${snapshot.lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                            </div>
+                            <div class="snapshot-detail">
+                                <div class="snapshot-detail-label">Trades</div>
+                                <div class="snapshot-detail-value">${snapshot.totalTrades.toLocaleString()}</div>
+                            </div>
+                            <div class="snapshot-detail">
+                                <div class="snapshot-detail-label">Symbol</div>
+                                <div class="snapshot-detail-value">${snapshot.symbol}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
         </div>
-    `).join('');
+    `;
 
     cryptoData.innerHTML = html;
 }

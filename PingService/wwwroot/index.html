@@ -225,31 +225,62 @@
             <div class="tab-panel" id="cryptoPanel">
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>Crypto Monitoring - Binance BTC/USDT</h2>
+                        <h2>Crypto Monitoring</h2>
                         <div class="status-indicator" id="cryptoStatus">
                             <span class="status-dot"></span>
                             <span class="status-text">Stopped</span>
                         </div>
                     </div>
 
-                    <!-- Crypto Stats -->
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-label">Current Price</div>
-                            <div class="stat-value" id="cryptoPrice">$0.00</div>
+                    <!-- Stock Exchange Style Ticker -->
+                    <div class="crypto-ticker">
+                        <div class="ticker-header">
+                            <div class="ticker-symbol">
+                                <h3>BTC/USDT</h3>
+                                <span class="exchange-badge">BINANCE</span>
+                            </div>
+                            <div class="ticker-status" id="tickerStatus" style="display: none;">
+                                <span class="live-dot"></span>
+                                <span>LIVE</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-label">High Price</div>
-                            <div class="stat-value" id="cryptoHigh">$0.00</div>
+
+                        <!-- Main Price Display -->
+                        <div class="price-display">
+                            <span class="price-main" id="cryptoPrice">0.00</span>
+                            <span class="price-currency">USD</span>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Low Price</div>
-                            <div class="stat-value" id="cryptoLow">$0.00</div>
+
+                        <!-- Price Change -->
+                        <div class="price-change">
+                            <div class="change-value" id="priceChange">
+                                <span class="change-arrow">—</span>
+                                <span id="changeAmount">$0.00</span>
+                                <span class="change-percent" id="changePercent">(0.00%)</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Snapshots Stored</div>
-                            <div class="stat-value" id="cryptoSnapshots">0</div>
+
+                        <!-- Mini Stats -->
+                        <div class="crypto-mini-stats">
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">24h High</div>
+                                <div class="mini-stat-value high" id="cryptoHigh">$0.00</div>
+                            </div>
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">24h Low</div>
+                                <div class="mini-stat-value low" id="cryptoLow">$0.00</div>
+                            </div>
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">24h Volume</div>
+                                <div class="mini-stat-value" id="cryptoVolume">0</div>
+                            </div>
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">Snapshots</div>
+                                <div class="mini-stat-value" id="cryptoSnapshots">0</div>
+                            </div>
                         </div>
+
+                        <div class="last-update" id="lastUpdate">Last update: Never</div>
                     </div>
 
                     <!-- System Controls -->
@@ -269,10 +300,11 @@
                         <button class="btn btn-secondary" onclick="showAllCryptoData()">Show All</button>
                     </div>
 
-                    <!-- Crypto Data Display -->
-                    <div class="sports-data" id="cryptoData">
+                    <!-- Crypto Historical Snapshots -->
+                    <div id="cryptoData">
                         <div class="no-data">
-                            Click "START Monitoring" to begin collecting real-time crypto data
+                            Click "START Monitoring" to begin collecting real-time crypto data.<br>
+                            Snapshots are automatically saved every 10 minutes.
                         </div>
                     </div>
                 </div>
