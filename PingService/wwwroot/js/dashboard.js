@@ -976,6 +976,238 @@ async function searchCoordinates() {
 }
 
 // ============================================================================
+// ============================================================================
+// Start/Stop System Controls with Confirmation
+// ============================================================================
+
+async function startPingSystem() {
+    if (!confirm('⚠️ START PING COLLECTION?\n\nThis will generate 20,000 coordinates per second and consume significant memory.\n\nClick OK to confirm and begin data collection.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/ping/start`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startPingBtn').disabled = true;
+            document.getElementById('stopPingBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = false;
+            document.getElementById('pingWarning').style.display = 'block';
+            alert('✅ ' + data.message);
+            console.log('Ping system started:', data);
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error starting ping system:', error);
+        alert('❌ Failed to start ping system. Check console for details.');
+    }
+}
+
+async function stopPingSystem() {
+    if (!confirm('⏹️ STOP PING COLLECTION?\n\nThis will IMMEDIATELY cease all ping generation.\n\nClick OK to confirm.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/ping/stop`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startPingBtn').disabled = false;
+            document.getElementById('stopPingBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pingWarning').style.display = 'none';
+            alert('✅ ' + data.message);
+            console.log('Ping system stopped:', data);
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error stopping ping system:', error);
+        alert('❌ Failed to stop ping system. Check console for details.');
+    }
+}
+
+async function startCryptoSystem() {
+    if (!confirm('🔗 START CRYPTO MONITORING?\n\nThis will connect to Binance WebSocket for real-time BTC/USDT price monitoring.\n\nSnapshots will be taken every 10 minutes and timestamped.\n\nClick OK to confirm.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/crypto/start`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startCryptoBtn').disabled = true;
+            document.getElementById('stopCryptoBtn').disabled = false;
+            document.getElementById('cryptoWarning').style.display = 'block';
+
+            const statusDot = document.querySelector('#cryptoStatus .status-dot');
+            const statusText = document.querySelector('#cryptoStatus .status-text');
+            statusDot.classList.add('running');
+            statusText.textContent = 'Connected';
+
+            alert('✅ ' + data.message);
+            console.log('Crypto monitoring started:', data);
+
+            // Start polling for crypto updates
+            startCryptoPricePolling();
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error starting crypto monitoring:', error);
+        alert('❌ Failed to start crypto monitoring. Check console for details.');
+    }
+}
+
+async function stopCryptoSystem() {
+    if (!confirm('⏹️ STOP CRYPTO MONITORING?\n\nThis will IMMEDIATELY disconnect from Binance and cease all crypto data collection.\n\nClick OK to confirm.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/crypto/stop`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startCryptoBtn').disabled = false;
+            document.getElementById('stopCryptoBtn').disabled = true;
+            document.getElementById('cryptoWarning').style.display = 'none';
+
+            const statusDot = document.querySelector('#cryptoStatus .status-dot');
+            const statusText = document.querySelector('#cryptoStatus .status-text');
+            statusDot.classList.remove('running');
+            statusText.textContent = 'Stopped';
+
+            alert('✅ ' + data.message);
+            console.log('Crypto monitoring stopped:', data);
+
+            // Stop polling
+            stopCryptoPricePolling();
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error stopping crypto monitoring:', error);
+        alert('❌ Failed to stop crypto monitoring. Check console for details.');
+    }
+}
+
+// ============================================================================
+// Crypto Price Polling
+// ============================================================================
+
+let cryptoPriceInterval = null;
+
+function startCryptoPricePolling() {
+    if (cryptoPriceInterval) clearInterval(cryptoPriceInterval);
+
+    cryptoPriceInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${PING_SERVICE_URL}/api/crypto/stats`);
+            if (response.ok) {
+                const stats = await response.json();
+                updateCryptoStats(stats);
+            }
+        } catch (error) {
+            console.error('Error polling crypto stats:', error);
+        }
+    }, 2000); // Poll every 2 seconds
+}
+
+function stopCryptoPricePolling() {
+    if (cryptoPriceInterval) {
+        clearInterval(cryptoPriceInterval);
+        cryptoPriceInterval = null;
+    }
+}
+
+function updateCryptoStats(stats) {
+    document.getElementById('cryptoPrice').textContent = '$' + stats.currentPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('cryptoHigh').textContent = '$' + stats.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('cryptoLow').textContent = '$' + stats.lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('cryptoSnapshots').textContent = stats.totalSnapshots;
+}
+
+async function loadCryptoSnapshots() {
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/crypto/snapshots`);
+        if (response.ok) {
+            const snapshots = await response.json();
+            displayCryptoSnapshots(snapshots);
+        } else {
+            alert('Failed to load crypto snapshots');
+        }
+    } catch (error) {
+        console.error('Error loading snapshots:', error);
+        alert('Error loading crypto snapshots');
+    }
+}
+
+function displayCryptoSnapshots(snapshots) {
+    const cryptoData = document.getElementById('cryptoData');
+
+    if (!snapshots || snapshots.length === 0) {
+        cryptoData.innerHTML = '<div class="no-data">No snapshots available yet. Start monitoring to begin collecting data.</div>';
+        return;
+    }
+
+    const html = snapshots.map(snapshot => `
+        <div class="game-card">
+            <div class="game-teams">
+                <span>🕐 ${new Date(snapshot.timestamp).toLocaleString()}</span>
+                <span class="game-score">$${snapshot.price.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                <span>${snapshot.symbol}</span>
+            </div>
+            <div class="game-status">
+                High: $${snapshot.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2})} |
+                Low: $${snapshot.lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2})} |
+                Trades: ${snapshot.totalTrades.toLocaleString()}
+            </div>
+        </div>
+    `).join('');
+
+    cryptoData.innerHTML = html;
+}
+
+async function filterCryptoByDate() {
+    const dateFilter = document.getElementById('cryptoDateFilter').value;
+
+    if (!dateFilter) {
+        alert('Please select a date');
+        return;
+    }
+
+    // Convert to date range (full day)
+    const startDate = new Date(dateFilter + 'T00:00:00Z').toISOString();
+    const endDate = new Date(dateFilter + 'T23:59:59Z').toISOString();
+
+    try {
+        const response = await fetch(
+            `${PING_SERVICE_URL}/api/crypto/snapshots/range?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+        );
+
+        if (response.ok) {
+            const snapshots = await response.json();
+            displayCryptoSnapshots(snapshots);
+        } else {
+            alert('Failed to filter crypto data');
+        }
+    } catch (error) {
+        console.error('Error filtering crypto data:', error);
+        alert('Error filtering crypto data');
+    }
+}
+
+function showAllCryptoData() {
+    document.getElementById('cryptoDateFilter').value = '';
+    loadCryptoSnapshots();
+}
+
+// ============================================================================
 // Tab Switching Functionality
 // ============================================================================
 
@@ -994,6 +1226,9 @@ function switchTab(tabName) {
     if (tabName === 'ping') {
         document.getElementById('pingTab').classList.add('active');
         document.getElementById('pingPanel').classList.add('active');
+    } else if (tabName === 'crypto') {
+        document.getElementById('cryptoTab').classList.add('active');
+        document.getElementById('cryptoPanel').classList.add('active');
     } else if (tabName === 'sports') {
         document.getElementById('sportsTab').classList.add('active');
         document.getElementById('sportsPanel').classList.add('active');
@@ -1287,9 +1522,18 @@ window.searchCoordinates = searchCoordinates;
 window.fetchSportsData = fetchSportsData;
 window.loadStoredGames = loadStoredGames;
 
-// Ping data functions
+// Ping control functions
+window.startPingSystem = startPingSystem;
+window.stopPingSystem = stopPingSystem;
 window.sortTable = sortTable;
 window.clearSavedData = clearSavedData;
+
+// Crypto control functions
+window.startCryptoSystem = startCryptoSystem;
+window.stopCryptoSystem = stopCryptoSystem;
+window.loadCryptoSnapshots = loadCryptoSnapshots;
+window.filterCryptoByDate = filterCryptoByDate;
+window.showAllCryptoData = showAllCryptoData;
 
 // Tab navigation
 window.switchTab = switchTab;
@@ -1309,4 +1553,12 @@ window.toggleAnimations = toggleAnimations;
 window.updateOpacity = updateOpacity;
 window.resetSettings = resetSettings;
 
-console.log('Dashboard JavaScript - Professional Edition Loaded Successfully');
+console.log('==================================================');
+console.log('CodexEterna Data Pipeline v2.0 - UI Loaded');
+console.log('==================================================');
+console.log('✅ Ping System (20k/sec) - Ready');
+console.log('✅ Crypto Monitoring (Binance) - Ready');
+console.log('✅ Sports Data Feed (ESPN) - Ready');
+console.log('==================================================');
+console.log('⚠️  All systems require MANUAL START');
+console.log('==================================================');
