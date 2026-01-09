@@ -449,7 +449,6 @@ function setupEventHandlers() {
 
     // Initialize customization features
     loadSavedSettings();
-    initializeParticles();
 
     // Update pause button initial state
     updatePauseButtonState();
@@ -737,6 +736,11 @@ function displayESPNGames(data) {
         return;
     }
 
+    // Store data with timestamp
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+    storeSportsDataWithTimestamp(sport, data);
+
     const html = data.events.map(event => {
         const competition = event.competitions[0];
         const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
@@ -749,12 +753,140 @@ function displayESPNGames(data) {
                     <span class="game-score">${awayTeam.score || '0'} - ${homeTeam.score || '0'}</span>
                     <span>${homeTeam.team.displayName || 'Home Team'}</span>
                 </div>
-                <div class="game-status">${competition.status.type.detail || 'Status Unknown'} | ${new Date(event.date).toLocaleString()}</div>
+                <div class="game-status">${competition.status.type.detail || 'Status Unknown'}</div>
+                <div class="game-date">Fetched: ${new Date().toLocaleString()}</div>
             </div>
         `;
     }).join('');
 
     sportsData.innerHTML = html;
+    updateHistorySummary();
+}
+
+// ============================================================================
+// Historical Sports Data Management
+// ============================================================================
+
+function storeSportsDataWithTimestamp(sport, data) {
+    try {
+        // Get existing sports history
+        let sportsHistory = JSON.parse(localStorage.getItem('codexeterna_sports_history')) || {};
+
+        // Create entry with timestamp
+        const timestamp = new Date().toISOString();
+        const dateKey = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        if (!sportsHistory[sport]) {
+            sportsHistory[sport] = {};
+        }
+
+        if (!sportsHistory[sport][dateKey]) {
+            sportsHistory[sport][dateKey] = [];
+        }
+
+        // Store the data with timestamp
+        sportsHistory[sport][dateKey].push({
+            timestamp: timestamp,
+            data: data
+        });
+
+        // Save back to localStorage
+        localStorage.setItem('codexeterna_sports_history', JSON.stringify(sportsHistory));
+        console.log(`Stored sports data for ${sport} on ${dateKey}`);
+    } catch (error) {
+        console.error('Error storing sports data:', error);
+    }
+}
+
+function filterSportsByDate() {
+    const dateFilter = document.getElementById('dateFilter').value;
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+
+    if (!dateFilter || !sport) {
+        alert('Please select both a sport and a date');
+        return;
+    }
+
+    try {
+        const sportsHistory = JSON.parse(localStorage.getItem('codexeterna_sports_history')) || {};
+
+        if (!sportsHistory[sport] || !sportsHistory[sport][dateFilter]) {
+            alert(`No data found for ${sport} on ${dateFilter}`);
+            return;
+        }
+
+        const dayData = sportsHistory[sport][dateFilter];
+        const sportsData = document.getElementById('sportsData');
+
+        // Display all entries for that date
+        const html = dayData.map((entry, index) => {
+            return `
+                <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
+                    <h3 style="color: var(--primary-color); margin-bottom: 15px;">
+                        Fetch #${index + 1} - ${new Date(entry.timestamp).toLocaleTimeString()}
+                    </h3>
+                    ${entry.data.events.map(event => {
+                        const competition = event.competitions[0];
+                        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+                        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+
+                        return `
+                            <div class="game-card">
+                                <div class="game-teams">
+                                    <span>${awayTeam.team.displayName || 'Away Team'}</span>
+                                    <span class="game-score">${awayTeam.score || '0'} - ${homeTeam.score || '0'}</span>
+                                    <span>${homeTeam.team.displayName || 'Home Team'}</span>
+                                </div>
+                                <div class="game-status">${competition.status.type.detail || 'Status Unknown'}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }).join('');
+
+        sportsData.innerHTML = html || '<div class="no-data">No games found in historical data</div>';
+    } catch (error) {
+        console.error('Error filtering sports data:', error);
+        alert('Error loading historical data');
+    }
+}
+
+function showAllSportsData() {
+    // Clear date filter
+    document.getElementById('dateFilter').value = '';
+
+    // Reload current data
+    loadStoredGames();
+}
+
+function clearSportsHistory() {
+    if (!confirm('Clear all historical sports data? This cannot be undone.')) {
+        return;
+    }
+
+    localStorage.removeItem('codexeterna_sports_history');
+    updateHistorySummary();
+    document.getElementById('sportsData').innerHTML = '<div class="no-data">Historical data cleared. Fetch new data to begin.</div>';
+    console.log('Cleared sports history');
+}
+
+function updateHistorySummary() {
+    try {
+        const sportsHistory = JSON.parse(localStorage.getItem('codexeterna_sports_history')) || {};
+        let totalRecords = 0;
+
+        for (const sport in sportsHistory) {
+            for (const date in sportsHistory[sport]) {
+                totalRecords += sportsHistory[sport][date].length;
+            }
+        }
+
+        document.getElementById('historyCount').textContent = `${totalRecords} record${totalRecords !== 1 ? 's' : ''}`;
+    } catch (error) {
+        console.error('Error updating history summary:', error);
+    }
 }
 
 async function loadStoredGames() {
@@ -844,82 +976,90 @@ async function searchCoordinates() {
 }
 
 // ============================================================================
+// Tab Switching Functionality
+// ============================================================================
+
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Update tab panels
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+
+    // Activate selected tab
+    if (tabName === 'ping') {
+        document.getElementById('pingTab').classList.add('active');
+        document.getElementById('pingPanel').classList.add('active');
+    } else if (tabName === 'sports') {
+        document.getElementById('sportsTab').classList.add('active');
+        document.getElementById('sportsPanel').classList.add('active');
+        updateHistorySummary();
+    }
+}
+
+// ============================================================================
 // Theme & Customization Features
 // ============================================================================
 
-// Theme Presets
+// Professional Theme Presets
 const THEME_PRESETS = {
-    'cozy-cafe': {
-        color1: '#2c1810',
-        color2: '#1a0f0a',
-        primaryColor: '#d4a574',
-        successColor: '#7fc8a9',
-        warningColor: '#f0b67f',
-        dangerColor: '#e17b77',
-        infoColor: '#89b4f8'
-    },
-    'midnight-coder': {
-        color1: '#0f0f23',
-        color2: '#1a1a2e',
-        primaryColor: '#64b5f6',
-        successColor: '#81c784',
-        warningColor: '#ffb74d',
-        dangerColor: '#e57373',
-        infoColor: '#ba68c8'
-    },
-    'forest-retreat': {
-        color1: '#1a2f1a',
-        color2: '#0d1f0d',
-        primaryColor: '#8bc34a',
-        successColor: '#4caf50',
-        warningColor: '#ffb300',
-        dangerColor: '#f4511e',
-        infoColor: '#26c6da'
-    },
-    'sunset-lounge': {
-        color1: '#2d1b2e',
-        color2: '#1f0d1f',
-        primaryColor: '#ff7043',
-        successColor: '#66bb6a',
-        warningColor: '#ffca28',
-        dangerColor: '#ef5350',
-        infoColor: '#ab47bc'
-    },
-    'ocean-breeze': {
-        color1: '#0d1f2d',
-        color2: '#081220',
-        primaryColor: '#4dd0e1',
-        successColor: '#26a69a',
-        warningColor: '#ffa726',
-        dangerColor: '#ef5350',
-        infoColor: '#5c6bc0'
-    },
-    'lavender-dreams': {
-        color1: '#2d1f3f',
-        color2: '#1a0f2e',
-        primaryColor: '#ce93d8',
-        successColor: '#81c784',
-        warningColor: '#ffb74d',
-        dangerColor: '#ef5350',
+    'executive-dark': {
+        color1: '#1a1d29',
+        color2: '#0f1117',
+        primaryColor: '#5b9bd5',
+        successColor: '#70ad47',
+        warningColor: '#ffc000',
+        dangerColor: '#e74c3c',
         infoColor: '#7986cb'
     },
-    'retro-synthwave': {
-        color1: '#1a0033',
-        color2: '#2d0052',
-        primaryColor: '#ff00ff',
-        successColor: '#00ff00',
-        warningColor: '#ffff00',
-        dangerColor: '#ff0055',
-        infoColor: '#00ffff'
+    'corporate-blue': {
+        color1: '#1e3a5f',
+        color2: '#0f1e3a',
+        primaryColor: '#4a90e2',
+        successColor: '#7cb342',
+        warningColor: '#fb8c00',
+        dangerColor: '#e53935',
+        infoColor: '#5c6bc0'
     },
-    'minimal-zen': {
-        color1: '#2b2d2f',
-        color2: '#1a1c1e',
-        primaryColor: '#a8a8a8',
-        successColor: '#7a9d96',
-        warningColor: '#c4a57b',
-        dangerColor: '#b47f7f',
-        infoColor: '#8b9bb3'
+    'clean-light': {
+        color1: '#e8eaf6',
+        color2: '#c5cae9',
+        primaryColor: '#3f51b5',
+        successColor: '#43a047',
+        warningColor: '#fb8c00',
+        dangerColor: '#e53935',
+        infoColor: '#5c6bc0'
+    },
+    'minimalist-slate': {
+        color1: '#37474f',
+        color2: '#263238',
+        primaryColor: '#78909c',
+        successColor: '#66bb6a',
+        warningColor: '#ffb74d',
+        dangerColor: '#ef5350',
+        infoColor: '#90a4ae'
+    },
+    'professional-navy': {
+        color1: '#0d1b2a',
+        color2: '#1b263b',
+        primaryColor: '#4a7ba7',
+        successColor: '#52b788',
+        warningColor: '#f77f00',
+        dangerColor: '#d62828',
+        infoColor: '#6c757d'
+    },
+    'modern-charcoal': {
+        color1: '#2d3436',
+        color2: '#1e272e',
+        primaryColor: '#74b9ff',
+        successColor: '#55efc4',
+        warningColor: '#fdcb6e',
+        dangerColor: '#ff7675',
+        infoColor: '#a29bfe'
     }
 };
 
@@ -1001,73 +1141,6 @@ function hexToRgb(hex) {
     } : null;
 }
 
-// Toggle Particles
-let particlesInterval = null;
-function toggleParticles() {
-    const enabled = document.getElementById('particlesEnabled').checked;
-    const container = document.getElementById('particlesContainer');
-
-    if (enabled) {
-        container.classList.add('active');
-        startParticles();
-    } else {
-        container.classList.remove('active');
-        stopParticles();
-    }
-
-    saveSettings();
-}
-
-// Initialize Particles
-function initializeParticles() {
-    // Particles will start if enabled in saved settings
-    const enabled = document.getElementById('particlesEnabled').checked;
-    if (enabled) {
-        startParticles();
-    }
-}
-
-// Start Particles Animation
-function startParticles() {
-    if (particlesInterval) return;
-
-    const container = document.getElementById('particlesContainer');
-
-    particlesInterval = setInterval(() => {
-        const particle = document.createElement('div');
-        particle.className = 'particle';
-
-        // Random position
-        particle.style.left = Math.random() * 100 + '%';
-
-        // Random animation duration (10-20 seconds)
-        const duration = 10 + Math.random() * 10;
-        particle.style.animationDuration = duration + 's';
-
-        // Random size (2-6px)
-        const size = 2 + Math.random() * 4;
-        particle.style.width = size + 'px';
-        particle.style.height = size + 'px';
-
-        container.appendChild(particle);
-
-        // Remove particle after animation
-        setTimeout(() => {
-            particle.remove();
-        }, duration * 1000);
-    }, 300);
-}
-
-// Stop Particles Animation
-function stopParticles() {
-    if (particlesInterval) {
-        clearInterval(particlesInterval);
-        particlesInterval = null;
-    }
-
-    const container = document.getElementById('particlesContainer');
-    container.innerHTML = '';
-}
 
 // Toggle Blur Effect
 function toggleBlur() {
@@ -1124,7 +1197,6 @@ function saveSettings() {
         bgColor1: document.getElementById('customColor1').value,
         bgColor2: document.getElementById('customColor2').value,
         gradientAngle: document.getElementById('gradientAngle').value,
-        particlesEnabled: document.getElementById('particlesEnabled').checked,
         blurEnabled: document.getElementById('blurEnabled').checked,
         animationsEnabled: document.getElementById('animationsEnabled').checked,
         panelOpacity: document.getElementById('panelOpacity').value
@@ -1153,16 +1225,11 @@ function loadSavedSettings() {
             document.getElementById('opacityValue').textContent = settings.panelOpacity;
         }
 
-        document.getElementById('particlesEnabled').checked = settings.particlesEnabled || false;
         document.getElementById('blurEnabled').checked = settings.blurEnabled !== false;
         document.getElementById('animationsEnabled').checked = settings.animationsEnabled !== false;
 
         // Apply settings
         applyCustomGradient();
-
-        if (settings.particlesEnabled) {
-            toggleParticles();
-        }
 
         if (settings.blurEnabled === false) {
             toggleBlur();
@@ -1187,26 +1254,20 @@ function resetSettings() {
     // Clear localStorage
     localStorage.removeItem('codexeterna_settings');
 
-    // Reset to Cozy Café theme
-    applyPreset('cozy-cafe');
+    // Reset to Executive Dark theme
+    applyPreset('executive-dark');
 
     // Reset controls
     document.getElementById('gradientAngle').value = 135;
     document.getElementById('angleValue').textContent = 135;
     document.getElementById('panelOpacity').value = 95;
     document.getElementById('opacityValue').textContent = 95;
-    document.getElementById('particlesEnabled').checked = false;
     document.getElementById('blurEnabled').checked = true;
     document.getElementById('animationsEnabled').checked = true;
 
-    // Disable particles
-    if (particlesInterval) {
-        toggleParticles();
-    }
-
     // Reset effects
     document.body.classList.remove('blur-disabled', 'animations-disabled');
-    document.documentElement.style.setProperty('--blur-amount', '12px');
+    document.documentElement.style.setProperty('--blur-amount', '10px');
     document.documentElement.style.setProperty('--animation-enabled', '1');
 
     updateOpacity();
@@ -1218,6 +1279,7 @@ function resetSettings() {
 // Expose functions globally for onclick handlers
 // ============================================================================
 
+// Core functions
 window.togglePause = togglePause;
 window.resetSystem = resetSystem;
 window.reconnect = reconnect;
@@ -1225,18 +1287,26 @@ window.searchCoordinates = searchCoordinates;
 window.fetchSportsData = fetchSportsData;
 window.loadStoredGames = loadStoredGames;
 
-// New functions
+// Ping data functions
 window.sortTable = sortTable;
 window.clearSavedData = clearSavedData;
+
+// Tab navigation
+window.switchTab = switchTab;
+
+// Sports history functions
+window.filterSportsByDate = filterSportsByDate;
+window.showAllSportsData = showAllSportsData;
+window.clearSportsHistory = clearSportsHistory;
+window.updateHistorySummary = updateHistorySummary;
 
 // Customization functions
 window.toggleSettings = toggleSettings;
 window.applyPreset = applyPreset;
 window.applyCustomGradient = applyCustomGradient;
-window.toggleParticles = toggleParticles;
 window.toggleBlur = toggleBlur;
 window.toggleAnimations = toggleAnimations;
 window.updateOpacity = updateOpacity;
 window.resetSettings = resetSettings;
 
-console.log('Dashboard JavaScript with Real-Time Ping Generation & Customization loaded successfully');
+console.log('Dashboard JavaScript - Professional Edition Loaded Successfully');
