@@ -174,11 +174,21 @@
 
                 <!-- Controls -->
                 <div class="controls">
-                    <button class="btn btn-warning" id="pauseBtn" onclick="togglePause()">
-                        <span id="pauseBtnText">⏸ Pause</span>
+                    <button class="btn btn-success" id="pauseBtn" onclick="togglePause()">
+                        <span id="pauseBtnText">▶ Resume</span>
                     </button>
-                    <button class="btn btn-danger" id="resetBtn" onclick="resetSystem()">🔄 Reset</button>
+                    <button class="btn btn-danger" id="resetBtn" onclick="resetSystem()">🔄 Reset Data</button>
                     <button class="btn btn-primary" id="reconnectBtn" onclick="reconnect()">🔌 Reconnect</button>
+                    <button class="btn btn-secondary" id="clearDataBtn" onclick="clearSavedData()">🗑 Clear Saved</button>
+                </div>
+
+                <!-- Sorting Controls -->
+                <div class="sort-section">
+                    <label>Sort By:</label>
+                    <button class="btn btn-sort" onclick="sortTable('count-desc')">📊 Most Frequent</button>
+                    <button class="btn btn-sort" onclick="sortTable('count-asc')">📉 Least Frequent</button>
+                    <button class="btn btn-sort" onclick="sortTable('time-desc')">🕐 Most Recent</button>
+                    <button class="btn btn-sort" onclick="sortTable('time-asc')">🕑 Oldest</button>
                 </div>
 
                 <!-- Search/Filter -->
@@ -186,7 +196,6 @@
                     <input type="text" id="searchInput" placeholder="Search coordinates (e.g., 33.42, -111.83)"
                            class="search-input">
                     <button class="btn btn-secondary" onclick="searchCoordinates()">🔍 Search</button>
-                    <button class="btn btn-secondary" onclick="loadTopCoordinates()">⭐ Top 100</button>
                 </div>
 
                 <!-- Coordinate Data Table -->
@@ -194,10 +203,10 @@
                     <table class="data-table" id="pingTable">
                         <thead>
                             <tr>
-                                <th>Latitude</th>
-                                <th>Longitude</th>
-                                <th>Count</th>
-                                <th>Last Seen</th>
+                                <th onclick="sortTable('lat-asc')" style="cursor: pointer;">Latitude ▲▼</th>
+                                <th onclick="sortTable('lng-asc')" style="cursor: pointer;">Longitude ▲▼</th>
+                                <th onclick="sortTable('count-desc')" style="cursor: pointer;">Ping Count ▲▼</th>
+                                <th onclick="sortTable('time-desc')" style="cursor: pointer;">Last Seen ▲▼</th>
                             </tr>
                         </thead>
                         <tbody id="pingTableBody">
@@ -205,7 +214,7 @@
                         </tbody>
                     </table>
                     <div id="noDataMessage" class="no-data">
-                        Waiting for coordinate data...
+                        Generating random coordinates... Please wait.
                     </div>
                 </div>
             </div>

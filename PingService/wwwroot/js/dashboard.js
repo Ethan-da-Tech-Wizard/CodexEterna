@@ -8,16 +8,30 @@ const UPDATE_THROTTLE_MS = 100;
 
 // State
 let connection = null;
-let isPaused = false;
+let isPaused = true; // Start paused
 let coordinateData = new Map();
 let updateQueue = [];
 let lastUpdateTime = 0;
+let pingGeneratorInterval = null;
+let currentSortMode = 'count-desc';
 
 // Initialize dashboard on page load
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing Real-Time Data Pipeline Dashboard...');
-    await initializeSignalR();
+
+    // Load saved ping data from localStorage
+    loadSavedPingData();
+
+    // Initialize SignalR (optional - for real backend connection)
+    // await initializeSignalR();
+
+    // Setup event handlers and start ping generator
     setupEventHandlers();
+
+    // Start generating random pings
+    startPingGenerator();
+
+    console.log('Dashboard initialized with local ping generation');
 });
 
 // ============================================================================
@@ -436,6 +450,397 @@ function setupEventHandlers() {
     // Initialize customization features
     loadSavedSettings();
     initializeParticles();
+
+    // Update pause button initial state
+    updatePauseButtonState();
+
+    // Save data before page unload
+    window.addEventListener('beforeunload', () => {
+        savePingDataToStorage();
+    });
+
+    // Auto-save every 10 seconds
+    setInterval(() => {
+        savePingDataToStorage();
+    }, 10000);
+}
+
+// ============================================================================
+// Random Ping Generation System
+// ============================================================================
+
+function startPingGenerator() {
+    if (pingGeneratorInterval) {
+        clearInterval(pingGeneratorInterval);
+    }
+
+    // Generate random pings every second
+    pingGeneratorInterval = setInterval(() => {
+        if (!isPaused) {
+            generateRandomPings();
+        }
+    }, 1000);
+
+    console.log('Ping generator started');
+}
+
+function generateRandomPings() {
+    // Generate 5-15 random coordinates per second
+    const numPings = Math.floor(Math.random() * 11) + 5;
+
+    for (let i = 0; i < numPings; i++) {
+        // Generate random latitude (-90 to 90) and longitude (-180 to 180)
+        const latitude = (Math.random() * 180 - 90).toFixed(6);
+        const longitude = (Math.random() * 360 - 180).toFixed(6);
+
+        // Create coordinate key
+        const key = `${latitude},${longitude}`;
+
+        // Get or create coordinate entry
+        if (coordinateData.has(key)) {
+            const existing = coordinateData.get(key);
+            existing.count++;
+            existing.timestamp = new Date().toISOString();
+        } else {
+            coordinateData.set(key, {
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
+                count: 1,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+
+    // Update the table display
+    updatePingTable();
+
+    // Update stats
+    document.getElementById('uniqueCoords').textContent = coordinateData.size.toLocaleString();
+    const totalPings = Array.from(coordinateData.values()).reduce((sum, coord) => sum + coord.count, 0);
+    document.getElementById('totalPings').textContent = totalPings.toLocaleString();
+}
+
+// ============================================================================
+// Table Sorting Functions
+// ============================================================================
+
+function sortTable(mode) {
+    currentSortMode = mode;
+
+    const sortedData = Array.from(coordinateData.values()).sort((a, b) => {
+        switch (mode) {
+            case 'count-desc':
+                return b.count - a.count;
+            case 'count-asc':
+                return a.count - b.count;
+            case 'time-desc':
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            case 'time-asc':
+                return new Date(a.timestamp) - new Date(b.timestamp);
+            case 'lat-asc':
+                return a.latitude - b.latitude;
+            case 'lat-desc':
+                return b.latitude - a.latitude;
+            case 'lng-asc':
+                return a.longitude - b.longitude;
+            case 'lng-desc':
+                return b.longitude - a.longitude;
+            default:
+                return b.count - a.count;
+        }
+    });
+
+    updatePingTableWithData(sortedData);
+}
+
+function updatePingTable() {
+    sortTable(currentSortMode);
+}
+
+function updatePingTableWithData(sortedData) {
+    const tbody = document.getElementById('pingTableBody');
+    const noDataMessage = document.getElementById('noDataMessage');
+
+    if (sortedData.length === 0) {
+        tbody.innerHTML = '';
+        noDataMessage.style.display = 'block';
+        return;
+    }
+
+    noDataMessage.style.display = 'none';
+
+    // Limit to MAX_TABLE_ROWS
+    const displayData = sortedData.slice(0, MAX_TABLE_ROWS);
+
+    // Build table HTML
+    const html = displayData.map(ping => `
+        <tr data-key="${ping.latitude},${ping.longitude}">
+            <td>${ping.latitude.toFixed(6)}</td>
+            <td>${ping.longitude.toFixed(6)}</td>
+            <td><strong>${ping.count.toLocaleString()}</strong></td>
+            <td>${formatTime(ping.timestamp)}</td>
+        </tr>
+    `).join('');
+
+    tbody.innerHTML = html;
+}
+
+// ============================================================================
+// LocalStorage Persistence
+// ============================================================================
+
+function savePingDataToStorage() {
+    try {
+        const dataArray = Array.from(coordinateData.entries());
+        localStorage.setItem('codexeterna_ping_data', JSON.stringify(dataArray));
+        console.log(`Saved ${dataArray.length} coordinates to localStorage`);
+    } catch (error) {
+        console.error('Error saving ping data:', error);
+    }
+}
+
+function loadSavedPingData() {
+    try {
+        const saved = localStorage.getItem('codexeterna_ping_data');
+        if (saved) {
+            const dataArray = JSON.parse(saved);
+            coordinateData = new Map(dataArray);
+            console.log(`Loaded ${coordinateData.size} saved coordinates from localStorage`);
+
+            // Update display
+            updatePingTable();
+
+            // Update stats
+            document.getElementById('uniqueCoords').textContent = coordinateData.size.toLocaleString();
+            const totalPings = Array.from(coordinateData.values()).reduce((sum, coord) => sum + coord.count, 0);
+            document.getElementById('totalPings').textContent = totalPings.toLocaleString();
+        }
+    } catch (error) {
+        console.error('Error loading saved ping data:', error);
+    }
+}
+
+function clearSavedData() {
+    if (!confirm('Clear all saved ping data? This cannot be undone.')) {
+        return;
+    }
+
+    localStorage.removeItem('codexeterna_ping_data');
+    coordinateData.clear();
+    updatePingTable();
+
+    document.getElementById('uniqueCoords').textContent = '0';
+    document.getElementById('totalPings').textContent = '0';
+
+    console.log('Cleared all saved ping data');
+}
+
+// ============================================================================
+// Updated Control Functions
+// ============================================================================
+
+function togglePause() {
+    isPaused = !isPaused;
+    updatePauseButtonState();
+    console.log(isPaused ? 'Paused' : 'Resumed');
+}
+
+function updatePauseButtonState() {
+    const btn = document.getElementById('pauseBtn');
+    const btnText = document.getElementById('pauseBtnText');
+
+    if (isPaused) {
+        btn.className = 'btn btn-success';
+        btnText.textContent = '▶ Resume';
+    } else {
+        btn.className = 'btn btn-warning';
+        btnText.textContent = '⏸ Pause';
+    }
+}
+
+function resetSystem() {
+    if (!confirm('Reset all ping data? This will clear the current session but keep saved data.')) {
+        return;
+    }
+
+    // Only clear current data, not localStorage
+    coordinateData.clear();
+    updatePingTable();
+
+    document.getElementById('uniqueCoords').textContent = '0';
+    document.getElementById('totalPings').textContent = '0';
+
+    console.log('Reset current session data');
+}
+
+// ============================================================================
+// Fixed Sports Data Functions
+// ============================================================================
+
+async function fetchSportsData() {
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+
+    if (!sport) {
+        alert('Please select a sport');
+        return;
+    }
+
+    const sportsData = document.getElementById('sportsData');
+    sportsData.innerHTML = '<div class="no-data"><div class="spinner"></div> Fetching live sports data...</div>';
+
+    try {
+        // Try the sports service first
+        const response = await fetch(`${SPORTS_SERVICE_URL}/api/sports/fetch?league=${sport}`);
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Sports data fetched:', data);
+
+            // Wait a moment then load stored games
+            setTimeout(() => loadStoredGames(), 1000);
+        } else {
+            // Fallback: Use ESPN API directly if service is down
+            await fetchFromESPNDirectly(sport);
+        }
+    } catch (error) {
+        console.error('Sports service unavailable, using ESPN API directly:', error);
+        await fetchFromESPNDirectly(sport);
+    }
+}
+
+async function fetchFromESPNDirectly(sport) {
+    const sportsData = document.getElementById('sportsData');
+
+    try {
+        // ESPN API endpoint
+        const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/${sport}/scoreboard`;
+        const response = await fetch(espnUrl);
+
+        if (response.ok) {
+            const data = await response.json();
+            displayESPNGames(data);
+        } else {
+            sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Failed to fetch sports data. ESPN API may be unavailable.</div>';
+        }
+    } catch (error) {
+        sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Error: Could not connect to ESPN API. Check your internet connection.</div>';
+        console.error('Error fetching from ESPN:', error);
+    }
+}
+
+function displayESPNGames(data) {
+    const sportsData = document.getElementById('sportsData');
+
+    if (!data.events || data.events.length === 0) {
+        sportsData.innerHTML = '<div class="no-data">No games found. Try a different sport or check back later.</div>';
+        return;
+    }
+
+    const html = data.events.map(event => {
+        const competition = event.competitions[0];
+        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+
+        return `
+            <div class="game-card">
+                <div class="game-teams">
+                    <span>${awayTeam.team.displayName || 'Away Team'}</span>
+                    <span class="game-score">${awayTeam.score || '0'} - ${homeTeam.score || '0'}</span>
+                    <span>${homeTeam.team.displayName || 'Home Team'}</span>
+                </div>
+                <div class="game-status">${competition.status.type.detail || 'Status Unknown'} | ${new Date(event.date).toLocaleString()}</div>
+            </div>
+        `;
+    }).join('');
+
+    sportsData.innerHTML = html;
+}
+
+async function loadStoredGames() {
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+
+    if (!sport) {
+        alert('Please select a sport');
+        return;
+    }
+
+    const sportsData = document.getElementById('sportsData');
+    sportsData.innerHTML = '<div class="no-data"><div class="spinner"></div> Loading...</div>';
+
+    try {
+        const response = await fetch(`${SPORTS_SERVICE_URL}/api/sports/games?league=${sport}`);
+
+        if (response.ok) {
+            const games = await response.json();
+            displayGames(games);
+        } else {
+            // If service is down, try ESPN API directly
+            const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/${sport}/scoreboard`;
+            const espnResponse = await fetch(espnUrl);
+            if (espnResponse.ok) {
+                const data = await espnResponse.json();
+                displayESPNGames(data);
+            } else {
+                sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Failed to load games</div>';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading games:', error);
+        // Try ESPN API as fallback
+        await fetchFromESPNDirectly(sport);
+    }
+}
+
+function displayGames(games) {
+    const sportsData = document.getElementById('sportsData');
+
+    if (!games || games.length === 0) {
+        sportsData.innerHTML = '<div class="no-data">No games found. Try fetching latest data.</div>';
+        return;
+    }
+
+    const html = games.map(game => `
+        <div class="game-card">
+            <div class="game-teams">
+                <span>${game.awayTeam || 'Away Team'}</span>
+                <span class="game-score">${game.awayScore || '0'} - ${game.homeScore || '0'}</span>
+                <span>${game.homeTeam || 'Home Team'}</span>
+            </div>
+            <div class="game-status">${game.status || 'Status Unknown'} | ${formatDate(game.date)}</div>
+        </div>
+    `).join('');
+
+    sportsData.innerHTML = html;
+}
+
+async function searchCoordinates() {
+    const searchInput = document.getElementById('searchInput');
+    const pattern = searchInput.value.trim();
+
+    if (!pattern) {
+        // If empty, show all data sorted
+        sortTable(currentSortMode);
+        return;
+    }
+
+    // Filter coordinates that match the search pattern
+    const filtered = Array.from(coordinateData.values()).filter(ping => {
+        const coordString = `${ping.latitude},${ping.longitude}`;
+        return coordString.includes(pattern);
+    });
+
+    if (filtered.length === 0) {
+        alert(`No coordinates found matching "${pattern}"`);
+        return;
+    }
+
+    // Sort filtered results
+    filtered.sort((a, b) => b.count - a.count);
+
+    updatePingTableWithData(filtered);
+    console.log(`Found ${filtered.length} coordinates matching "${pattern}"`);
 }
 
 // ============================================================================
@@ -817,9 +1222,12 @@ window.togglePause = togglePause;
 window.resetSystem = resetSystem;
 window.reconnect = reconnect;
 window.searchCoordinates = searchCoordinates;
-window.loadTopCoordinates = loadTopCoordinates;
 window.fetchSportsData = fetchSportsData;
 window.loadStoredGames = loadStoredGames;
+
+// New functions
+window.sortTable = sortTable;
+window.clearSavedData = clearSavedData;
 
 // Customization functions
 window.toggleSettings = toggleSettings;
@@ -831,4 +1239,4 @@ window.toggleAnimations = toggleAnimations;
 window.updateOpacity = updateOpacity;
 window.resetSettings = resetSettings;
 
-console.log('Dashboard JavaScript with Customization loaded successfully');
+console.log('Dashboard JavaScript with Real-Time Ping Generation & Customization loaded successfully');
