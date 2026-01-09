@@ -4,6 +4,28 @@ Follow these steps EXACTLY. Don't skip any step.
 
 ---
 
+## 🎯 USING VS CODE? START HERE!
+
+**If you're using Visual Studio Code on Windows, follow this quick path:**
+
+1. **Open this project in VS Code**
+   - File → Open Folder
+   - Select the `CodexEterna` folder (where `docker-compose.yml` is)
+   - ⚠️ **IMPORTANT**: Open the ROOT folder, not a subfolder!
+
+2. **Run the pipeline**
+   - Press `Ctrl+Shift+B` (or `Ctrl+Shift+P` → "Tasks: Run Task" → "Docker Compose: Build and Start")
+   - Wait for services to start
+
+3. **Test it**
+   - Open browser to `http://localhost:5000`
+
+📖 **For detailed VS Code instructions, see [VSCODE_GUIDE.md](VSCODE_GUIDE.md)**
+
+**Not using VS Code? Continue below...**
+
+---
+
 ## PART 1: Install Docker (ONE TIME ONLY)
 
 ### If you're on Windows:

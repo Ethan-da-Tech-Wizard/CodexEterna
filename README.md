@@ -8,6 +8,10 @@ A production-ready hybrid C# and Python microservices system demonstrating high-
 
 **👉 [START_HERE.md](START_HERE.md) - Ultra-simple setup guide (5 minutes)**
 
+**Using VS Code?**
+- **[VSCODE_GUIDE.md](VSCODE_GUIDE.md) - Complete VS Code setup & tasks** ⚡
+- Just open the folder and press `Ctrl+Shift+B` to run!
+
 **Too long, didn't read:**
 ```bash
 # 1. Install Docker Desktop from docker.com
