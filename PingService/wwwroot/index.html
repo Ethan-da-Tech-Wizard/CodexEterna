@@ -121,6 +121,9 @@
             <button class="tab-btn active" onclick="switchTab('ping')" id="pingTab">
                 Coordinate Ping Stream
             </button>
+            <button class="tab-btn" onclick="switchTab('crypto')" id="cryptoTab">
+                Crypto Monitoring
+            </button>
             <button class="tab-btn" onclick="switchTab('sports')" id="sportsTab">
                 Sports Data Feed
             </button>
@@ -168,14 +171,16 @@
                     </div>
                 </div>
 
-                <!-- Controls -->
+                <!-- System Controls -->
                 <div class="controls">
-                    <button class="btn btn-success" id="pauseBtn" onclick="togglePause()">
-                        <span id="pauseBtnText">▶ Resume</span>
-                    </button>
-                    <button class="btn btn-danger" id="resetBtn" onclick="resetSystem()">🔄 Reset Data</button>
-                    <button class="btn btn-primary" id="reconnectBtn" onclick="reconnect()">🔌 Reconnect</button>
+                    <button class="btn btn-success" id="startPingBtn" onclick="startPingSystem()">▶ START Collection</button>
+                    <button class="btn btn-danger" id="stopPingBtn" onclick="stopPingSystem()" disabled>⏹ STOP Collection</button>
+                    <button class="btn btn-warning" id="pauseBtn" onclick="togglePause()" disabled>⏸ Pause</button>
+                    <button class="btn btn-secondary" id="resetBtn" onclick="resetSystem()">🔄 Reset Data</button>
                     <button class="btn btn-secondary" id="clearDataBtn" onclick="clearSavedData()">🗑 Clear Saved</button>
+                </div>
+                <div class="warning-box" id="pingWarning" style="display: none; background: rgba(255,193,7,0.1); border: 1px solid var(--warning-color); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                    <strong>⚠️ WARNING:</strong> System will collect 20,000 pings/second. This will consume significant memory. Use STOP button to cease immediately.
                 </div>
 
                 <!-- Sorting Controls -->
@@ -216,6 +221,63 @@
                 </div>
             </div>
 
+            <!-- Crypto Monitoring Panel -->
+            <div class="tab-panel" id="cryptoPanel">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Crypto Monitoring - Binance BTC/USDT</h2>
+                        <div class="status-indicator" id="cryptoStatus">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Stopped</span>
+                        </div>
+                    </div>
+
+                    <!-- Crypto Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Current Price</div>
+                            <div class="stat-value" id="cryptoPrice">$0.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">High Price</div>
+                            <div class="stat-value" id="cryptoHigh">$0.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Low Price</div>
+                            <div class="stat-value" id="cryptoLow">$0.00</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Snapshots Stored</div>
+                            <div class="stat-value" id="cryptoSnapshots">0</div>
+                        </div>
+                    </div>
+
+                    <!-- System Controls -->
+                    <div class="controls">
+                        <button class="btn btn-success" id="startCryptoBtn" onclick="startCryptoSystem()">▶ START Monitoring</button>
+                        <button class="btn btn-danger" id="stopCryptoBtn" onclick="stopCryptoSystem()" disabled>⏹ STOP Monitoring</button>
+                        <button class="btn btn-secondary" onclick="loadCryptoSnapshots()">📊 View Snapshots</button>
+                    </div>
+                    <div class="warning-box" id="cryptoWarning" style="display: none; background: rgba(255,193,7,0.1); border: 1px solid var(--warning-color); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                        <strong>⚠️ CONFIRMATION:</strong> Connect to Binance WebSocket for real-time BTC/USDT monitoring? Snapshots will be taken every 10 minutes.
+                    </div>
+
+                    <!-- Date Filter -->
+                    <div class="date-filter-section">
+                        <label>Filter by Date:</label>
+                        <input type="date" id="cryptoDateFilter" class="date-input" onchange="filterCryptoByDate()">
+                        <button class="btn btn-secondary" onclick="showAllCryptoData()">Show All</button>
+                    </div>
+
+                    <!-- Crypto Data Display -->
+                    <div class="sports-data" id="cryptoData">
+                        <div class="no-data">
+                            Click "START Monitoring" to begin collecting real-time crypto data
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Sports Data Panel -->
             <div class="tab-panel" id="sportsPanel">
                 <div class="panel">
@@ -253,6 +315,9 @@
                             <button class="btn btn-success" onclick="fetchSportsData()">Fetch Latest Data</button>
                             <button class="btn btn-secondary" onclick="loadStoredGames()">Load Stored Data</button>
                         </div>
+                    </div>
+                    <div class="info-box" style="background: rgba(91,155,213,0.1); border: 1px solid var(--info-color); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                        <strong>ℹ️ INFO:</strong> Sports data is fetched on-demand from ESPN API. Each fetch is automatically timestamped and saved for historical viewing.
                     </div>
 
                     <!-- Historical Data Summary -->
