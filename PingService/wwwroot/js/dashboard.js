@@ -8,16 +8,30 @@ const UPDATE_THROTTLE_MS = 100;
 
 // State
 let connection = null;
-let isPaused = false;
+let isPaused = true; // Start paused
 let coordinateData = new Map();
 let updateQueue = [];
 let lastUpdateTime = 0;
+let pingGeneratorInterval = null;
+let currentSortMode = 'count-desc';
 
 // Initialize dashboard on page load
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing Real-Time Data Pipeline Dashboard...');
-    await initializeSignalR();
+
+    // Load saved ping data from localStorage
+    loadSavedPingData();
+
+    // Initialize SignalR (optional - for real backend connection)
+    // await initializeSignalR();
+
+    // Setup event handlers and start ping generator
     setupEventHandlers();
+
+    // Start generating random pings
+    startPingGenerator();
+
+    console.log('Dashboard initialized with local ping generation');
 });
 
 // ============================================================================
@@ -435,86 +449,852 @@ function setupEventHandlers() {
 
     // Initialize customization features
     loadSavedSettings();
-    initializeParticles();
+
+    // Update pause button initial state
+    updatePauseButtonState();
+
+    // Save data before page unload
+    window.addEventListener('beforeunload', () => {
+        savePingDataToStorage();
+    });
+
+    // Auto-save every 10 seconds
+    setInterval(() => {
+        savePingDataToStorage();
+    }, 10000);
+}
+
+// ============================================================================
+// Random Ping Generation System
+// ============================================================================
+
+function startPingGenerator() {
+    if (pingGeneratorInterval) {
+        clearInterval(pingGeneratorInterval);
+    }
+
+    // Generate random pings every second
+    pingGeneratorInterval = setInterval(() => {
+        if (!isPaused) {
+            generateRandomPings();
+        }
+    }, 1000);
+
+    console.log('Ping generator started');
+}
+
+function generateRandomPings() {
+    // Generate 5-15 random coordinates per second
+    const numPings = Math.floor(Math.random() * 11) + 5;
+
+    for (let i = 0; i < numPings; i++) {
+        // Generate random latitude (-90 to 90) and longitude (-180 to 180)
+        const latitude = (Math.random() * 180 - 90).toFixed(6);
+        const longitude = (Math.random() * 360 - 180).toFixed(6);
+
+        // Create coordinate key
+        const key = `${latitude},${longitude}`;
+
+        // Get or create coordinate entry
+        if (coordinateData.has(key)) {
+            const existing = coordinateData.get(key);
+            existing.count++;
+            existing.timestamp = new Date().toISOString();
+        } else {
+            coordinateData.set(key, {
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
+                count: 1,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+
+    // Update the table display
+    updatePingTable();
+
+    // Update stats
+    document.getElementById('uniqueCoords').textContent = coordinateData.size.toLocaleString();
+    const totalPings = Array.from(coordinateData.values()).reduce((sum, coord) => sum + coord.count, 0);
+    document.getElementById('totalPings').textContent = totalPings.toLocaleString();
+}
+
+// ============================================================================
+// Table Sorting Functions
+// ============================================================================
+
+function sortTable(mode) {
+    currentSortMode = mode;
+
+    const sortedData = Array.from(coordinateData.values()).sort((a, b) => {
+        switch (mode) {
+            case 'count-desc':
+                return b.count - a.count;
+            case 'count-asc':
+                return a.count - b.count;
+            case 'time-desc':
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            case 'time-asc':
+                return new Date(a.timestamp) - new Date(b.timestamp);
+            case 'lat-asc':
+                return a.latitude - b.latitude;
+            case 'lat-desc':
+                return b.latitude - a.latitude;
+            case 'lng-asc':
+                return a.longitude - b.longitude;
+            case 'lng-desc':
+                return b.longitude - a.longitude;
+            default:
+                return b.count - a.count;
+        }
+    });
+
+    updatePingTableWithData(sortedData);
+}
+
+function updatePingTable() {
+    sortTable(currentSortMode);
+}
+
+function updatePingTableWithData(sortedData) {
+    const tbody = document.getElementById('pingTableBody');
+    const noDataMessage = document.getElementById('noDataMessage');
+
+    if (sortedData.length === 0) {
+        tbody.innerHTML = '';
+        noDataMessage.style.display = 'block';
+        return;
+    }
+
+    noDataMessage.style.display = 'none';
+
+    // Limit to MAX_TABLE_ROWS
+    const displayData = sortedData.slice(0, MAX_TABLE_ROWS);
+
+    // Build table HTML
+    const html = displayData.map(ping => `
+        <tr data-key="${ping.latitude},${ping.longitude}">
+            <td>${ping.latitude.toFixed(6)}</td>
+            <td>${ping.longitude.toFixed(6)}</td>
+            <td><strong>${ping.count.toLocaleString()}</strong></td>
+            <td>${formatTime(ping.timestamp)}</td>
+        </tr>
+    `).join('');
+
+    tbody.innerHTML = html;
+}
+
+// ============================================================================
+// LocalStorage Persistence
+// ============================================================================
+
+function savePingDataToStorage() {
+    try {
+        const dataArray = Array.from(coordinateData.entries());
+        localStorage.setItem('codexeterna_ping_data', JSON.stringify(dataArray));
+        console.log(`Saved ${dataArray.length} coordinates to localStorage`);
+    } catch (error) {
+        console.error('Error saving ping data:', error);
+    }
+}
+
+function loadSavedPingData() {
+    try {
+        const saved = localStorage.getItem('codexeterna_ping_data');
+        if (saved) {
+            const dataArray = JSON.parse(saved);
+            coordinateData = new Map(dataArray);
+            console.log(`Loaded ${coordinateData.size} saved coordinates from localStorage`);
+
+            // Update display
+            updatePingTable();
+
+            // Update stats
+            document.getElementById('uniqueCoords').textContent = coordinateData.size.toLocaleString();
+            const totalPings = Array.from(coordinateData.values()).reduce((sum, coord) => sum + coord.count, 0);
+            document.getElementById('totalPings').textContent = totalPings.toLocaleString();
+        }
+    } catch (error) {
+        console.error('Error loading saved ping data:', error);
+    }
+}
+
+function clearSavedData() {
+    if (!confirm('Clear all saved ping data? This cannot be undone.')) {
+        return;
+    }
+
+    localStorage.removeItem('codexeterna_ping_data');
+    coordinateData.clear();
+    updatePingTable();
+
+    document.getElementById('uniqueCoords').textContent = '0';
+    document.getElementById('totalPings').textContent = '0';
+
+    console.log('Cleared all saved ping data');
+}
+
+// ============================================================================
+// Updated Control Functions
+// ============================================================================
+
+function togglePause() {
+    isPaused = !isPaused;
+    updatePauseButtonState();
+    console.log(isPaused ? 'Paused' : 'Resumed');
+}
+
+function updatePauseButtonState() {
+    const btn = document.getElementById('pauseBtn');
+    const btnText = document.getElementById('pauseBtnText');
+
+    if (isPaused) {
+        btn.className = 'btn btn-success';
+        btnText.textContent = '▶ Resume';
+    } else {
+        btn.className = 'btn btn-warning';
+        btnText.textContent = '⏸ Pause';
+    }
+}
+
+function resetSystem() {
+    if (!confirm('Reset all ping data? This will clear the current session but keep saved data.')) {
+        return;
+    }
+
+    // Only clear current data, not localStorage
+    coordinateData.clear();
+    updatePingTable();
+
+    document.getElementById('uniqueCoords').textContent = '0';
+    document.getElementById('totalPings').textContent = '0';
+
+    console.log('Reset current session data');
+}
+
+// ============================================================================
+// Fixed Sports Data Functions
+// ============================================================================
+
+async function fetchSportsData() {
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+
+    if (!sport) {
+        alert('Please select a sport');
+        return;
+    }
+
+    const sportsData = document.getElementById('sportsData');
+    sportsData.innerHTML = '<div class="no-data"><div class="spinner"></div> Fetching live sports data...</div>';
+
+    try {
+        // Try the sports service first
+        const response = await fetch(`${SPORTS_SERVICE_URL}/api/sports/fetch?league=${sport}`);
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Sports data fetched:', data);
+
+            // Wait a moment then load stored games
+            setTimeout(() => loadStoredGames(), 1000);
+        } else {
+            // Fallback: Use ESPN API directly if service is down
+            await fetchFromESPNDirectly(sport);
+        }
+    } catch (error) {
+        console.error('Sports service unavailable, using ESPN API directly:', error);
+        await fetchFromESPNDirectly(sport);
+    }
+}
+
+async function fetchFromESPNDirectly(sport) {
+    const sportsData = document.getElementById('sportsData');
+
+    try {
+        // ESPN API endpoint
+        const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/${sport}/scoreboard`;
+        const response = await fetch(espnUrl);
+
+        if (response.ok) {
+            const data = await response.json();
+            displayESPNGames(data);
+        } else {
+            sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Failed to fetch sports data. ESPN API may be unavailable.</div>';
+        }
+    } catch (error) {
+        sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Error: Could not connect to ESPN API. Check your internet connection.</div>';
+        console.error('Error fetching from ESPN:', error);
+    }
+}
+
+function displayESPNGames(data) {
+    const sportsData = document.getElementById('sportsData');
+
+    if (!data.events || data.events.length === 0) {
+        sportsData.innerHTML = '<div class="no-data">No games found. Try a different sport or check back later.</div>';
+        return;
+    }
+
+    // Store data with timestamp
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+    storeSportsDataWithTimestamp(sport, data);
+
+    const html = data.events.map(event => {
+        const competition = event.competitions[0];
+        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+
+        return `
+            <div class="game-card">
+                <div class="game-teams">
+                    <span>${awayTeam.team.displayName || 'Away Team'}</span>
+                    <span class="game-score">${awayTeam.score || '0'} - ${homeTeam.score || '0'}</span>
+                    <span>${homeTeam.team.displayName || 'Home Team'}</span>
+                </div>
+                <div class="game-status">${competition.status.type.detail || 'Status Unknown'}</div>
+                <div class="game-date">Fetched: ${new Date().toLocaleString()}</div>
+            </div>
+        `;
+    }).join('');
+
+    sportsData.innerHTML = html;
+    updateHistorySummary();
+}
+
+// ============================================================================
+// Historical Sports Data Management
+// ============================================================================
+
+function storeSportsDataWithTimestamp(sport, data) {
+    try {
+        // Get existing sports history
+        let sportsHistory = JSON.parse(localStorage.getItem('codexeterna_sports_history')) || {};
+
+        // Create entry with timestamp
+        const timestamp = new Date().toISOString();
+        const dateKey = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+        if (!sportsHistory[sport]) {
+            sportsHistory[sport] = {};
+        }
+
+        if (!sportsHistory[sport][dateKey]) {
+            sportsHistory[sport][dateKey] = [];
+        }
+
+        // Store the data with timestamp
+        sportsHistory[sport][dateKey].push({
+            timestamp: timestamp,
+            data: data
+        });
+
+        // Save back to localStorage
+        localStorage.setItem('codexeterna_sports_history', JSON.stringify(sportsHistory));
+        console.log(`Stored sports data for ${sport} on ${dateKey}`);
+    } catch (error) {
+        console.error('Error storing sports data:', error);
+    }
+}
+
+function filterSportsByDate() {
+    const dateFilter = document.getElementById('dateFilter').value;
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+
+    if (!dateFilter || !sport) {
+        alert('Please select both a sport and a date');
+        return;
+    }
+
+    try {
+        const sportsHistory = JSON.parse(localStorage.getItem('codexeterna_sports_history')) || {};
+
+        if (!sportsHistory[sport] || !sportsHistory[sport][dateFilter]) {
+            alert(`No data found for ${sport} on ${dateFilter}`);
+            return;
+        }
+
+        const dayData = sportsHistory[sport][dateFilter];
+        const sportsData = document.getElementById('sportsData');
+
+        // Display all entries for that date
+        const html = dayData.map((entry, index) => {
+            return `
+                <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
+                    <h3 style="color: var(--primary-color); margin-bottom: 15px;">
+                        Fetch #${index + 1} - ${new Date(entry.timestamp).toLocaleTimeString()}
+                    </h3>
+                    ${entry.data.events.map(event => {
+                        const competition = event.competitions[0];
+                        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+                        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+
+                        return `
+                            <div class="game-card">
+                                <div class="game-teams">
+                                    <span>${awayTeam.team.displayName || 'Away Team'}</span>
+                                    <span class="game-score">${awayTeam.score || '0'} - ${homeTeam.score || '0'}</span>
+                                    <span>${homeTeam.team.displayName || 'Home Team'}</span>
+                                </div>
+                                <div class="game-status">${competition.status.type.detail || 'Status Unknown'}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }).join('');
+
+        sportsData.innerHTML = html || '<div class="no-data">No games found in historical data</div>';
+    } catch (error) {
+        console.error('Error filtering sports data:', error);
+        alert('Error loading historical data');
+    }
+}
+
+function showAllSportsData() {
+    // Clear date filter
+    document.getElementById('dateFilter').value = '';
+
+    // Reload current data
+    loadStoredGames();
+}
+
+function clearSportsHistory() {
+    if (!confirm('Clear all historical sports data? This cannot be undone.')) {
+        return;
+    }
+
+    localStorage.removeItem('codexeterna_sports_history');
+    updateHistorySummary();
+    document.getElementById('sportsData').innerHTML = '<div class="no-data">Historical data cleared. Fetch new data to begin.</div>';
+    console.log('Cleared sports history');
+}
+
+function updateHistorySummary() {
+    try {
+        const sportsHistory = JSON.parse(localStorage.getItem('codexeterna_sports_history')) || {};
+        let totalRecords = 0;
+
+        for (const sport in sportsHistory) {
+            for (const date in sportsHistory[sport]) {
+                totalRecords += sportsHistory[sport][date].length;
+            }
+        }
+
+        document.getElementById('historyCount').textContent = `${totalRecords} record${totalRecords !== 1 ? 's' : ''}`;
+    } catch (error) {
+        console.error('Error updating history summary:', error);
+    }
+}
+
+async function loadStoredGames() {
+    const sportSelect = document.getElementById('sportSelect');
+    const sport = sportSelect.value;
+
+    if (!sport) {
+        alert('Please select a sport');
+        return;
+    }
+
+    const sportsData = document.getElementById('sportsData');
+    sportsData.innerHTML = '<div class="no-data"><div class="spinner"></div> Loading...</div>';
+
+    try {
+        const response = await fetch(`${SPORTS_SERVICE_URL}/api/sports/games?league=${sport}`);
+
+        if (response.ok) {
+            const games = await response.json();
+            displayGames(games);
+        } else {
+            // If service is down, try ESPN API directly
+            const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/${sport}/scoreboard`;
+            const espnResponse = await fetch(espnUrl);
+            if (espnResponse.ok) {
+                const data = await espnResponse.json();
+                displayESPNGames(data);
+            } else {
+                sportsData.innerHTML = '<div class="no-data" style="color: #ef4444;">Failed to load games</div>';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading games:', error);
+        // Try ESPN API as fallback
+        await fetchFromESPNDirectly(sport);
+    }
+}
+
+function displayGames(games) {
+    const sportsData = document.getElementById('sportsData');
+
+    if (!games || games.length === 0) {
+        sportsData.innerHTML = '<div class="no-data">No games found. Try fetching latest data.</div>';
+        return;
+    }
+
+    const html = games.map(game => `
+        <div class="game-card">
+            <div class="game-teams">
+                <span>${game.awayTeam || 'Away Team'}</span>
+                <span class="game-score">${game.awayScore || '0'} - ${game.homeScore || '0'}</span>
+                <span>${game.homeTeam || 'Home Team'}</span>
+            </div>
+            <div class="game-status">${game.status || 'Status Unknown'} | ${formatDate(game.date)}</div>
+        </div>
+    `).join('');
+
+    sportsData.innerHTML = html;
+}
+
+async function searchCoordinates() {
+    const searchInput = document.getElementById('searchInput');
+    const pattern = searchInput.value.trim();
+
+    if (!pattern) {
+        // If empty, show all data sorted
+        sortTable(currentSortMode);
+        return;
+    }
+
+    // Filter coordinates that match the search pattern
+    const filtered = Array.from(coordinateData.values()).filter(ping => {
+        const coordString = `${ping.latitude},${ping.longitude}`;
+        return coordString.includes(pattern);
+    });
+
+    if (filtered.length === 0) {
+        alert(`No coordinates found matching "${pattern}"`);
+        return;
+    }
+
+    // Sort filtered results
+    filtered.sort((a, b) => b.count - a.count);
+
+    updatePingTableWithData(filtered);
+    console.log(`Found ${filtered.length} coordinates matching "${pattern}"`);
+}
+
+// ============================================================================
+// ============================================================================
+// Start/Stop System Controls with Confirmation
+// ============================================================================
+
+async function startPingSystem() {
+    if (!confirm('⚠️ START PING COLLECTION?\n\nThis will generate 20,000 coordinates per second and consume significant memory.\n\nClick OK to confirm and begin data collection.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/ping/start`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startPingBtn').disabled = true;
+            document.getElementById('stopPingBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = false;
+            document.getElementById('pingWarning').style.display = 'block';
+            alert('✅ ' + data.message);
+            console.log('Ping system started:', data);
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error starting ping system:', error);
+        alert('❌ Failed to start ping system. Check console for details.');
+    }
+}
+
+async function stopPingSystem() {
+    if (!confirm('⏹️ STOP PING COLLECTION?\n\nThis will IMMEDIATELY cease all ping generation.\n\nClick OK to confirm.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/ping/stop`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startPingBtn').disabled = false;
+            document.getElementById('stopPingBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pingWarning').style.display = 'none';
+            alert('✅ ' + data.message);
+            console.log('Ping system stopped:', data);
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error stopping ping system:', error);
+        alert('❌ Failed to stop ping system. Check console for details.');
+    }
+}
+
+async function startCryptoSystem() {
+    if (!confirm('🔗 START CRYPTO MONITORING?\n\nThis will connect to Binance WebSocket for real-time BTC/USDT price monitoring.\n\nSnapshots will be taken every 10 minutes and timestamped.\n\nClick OK to confirm.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/crypto/start`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startCryptoBtn').disabled = true;
+            document.getElementById('stopCryptoBtn').disabled = false;
+            document.getElementById('cryptoWarning').style.display = 'block';
+
+            const statusDot = document.querySelector('#cryptoStatus .status-dot');
+            const statusText = document.querySelector('#cryptoStatus .status-text');
+            statusDot.classList.add('running');
+            statusText.textContent = 'Connected';
+
+            alert('✅ ' + data.message);
+            console.log('Crypto monitoring started:', data);
+
+            // Start polling for crypto updates
+            startCryptoPricePolling();
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error starting crypto monitoring:', error);
+        alert('❌ Failed to start crypto monitoring. Check console for details.');
+    }
+}
+
+async function stopCryptoSystem() {
+    if (!confirm('⏹️ STOP CRYPTO MONITORING?\n\nThis will IMMEDIATELY disconnect from Binance and cease all crypto data collection.\n\nClick OK to confirm.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/crypto/stop`, { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('startCryptoBtn').disabled = false;
+            document.getElementById('stopCryptoBtn').disabled = true;
+            document.getElementById('cryptoWarning').style.display = 'none';
+
+            const statusDot = document.querySelector('#cryptoStatus .status-dot');
+            const statusText = document.querySelector('#cryptoStatus .status-text');
+            statusDot.classList.remove('running');
+            statusText.textContent = 'Stopped';
+
+            alert('✅ ' + data.message);
+            console.log('Crypto monitoring stopped:', data);
+
+            // Stop polling
+            stopCryptoPricePolling();
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error stopping crypto monitoring:', error);
+        alert('❌ Failed to stop crypto monitoring. Check console for details.');
+    }
+}
+
+// ============================================================================
+// Crypto Price Polling
+// ============================================================================
+
+let cryptoPriceInterval = null;
+
+function startCryptoPricePolling() {
+    if (cryptoPriceInterval) clearInterval(cryptoPriceInterval);
+
+    cryptoPriceInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`${PING_SERVICE_URL}/api/crypto/stats`);
+            if (response.ok) {
+                const stats = await response.json();
+                updateCryptoStats(stats);
+            }
+        } catch (error) {
+            console.error('Error polling crypto stats:', error);
+        }
+    }, 2000); // Poll every 2 seconds
+}
+
+function stopCryptoPricePolling() {
+    if (cryptoPriceInterval) {
+        clearInterval(cryptoPriceInterval);
+        cryptoPriceInterval = null;
+    }
+}
+
+function updateCryptoStats(stats) {
+    document.getElementById('cryptoPrice').textContent = '$' + stats.currentPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('cryptoHigh').textContent = '$' + stats.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('cryptoLow').textContent = '$' + stats.lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('cryptoSnapshots').textContent = stats.totalSnapshots;
+}
+
+async function loadCryptoSnapshots() {
+    try {
+        const response = await fetch(`${PING_SERVICE_URL}/api/crypto/snapshots`);
+        if (response.ok) {
+            const snapshots = await response.json();
+            displayCryptoSnapshots(snapshots);
+        } else {
+            alert('Failed to load crypto snapshots');
+        }
+    } catch (error) {
+        console.error('Error loading snapshots:', error);
+        alert('Error loading crypto snapshots');
+    }
+}
+
+function displayCryptoSnapshots(snapshots) {
+    const cryptoData = document.getElementById('cryptoData');
+
+    if (!snapshots || snapshots.length === 0) {
+        cryptoData.innerHTML = '<div class="no-data">No snapshots available yet. Start monitoring to begin collecting data.</div>';
+        return;
+    }
+
+    const html = snapshots.map(snapshot => `
+        <div class="game-card">
+            <div class="game-teams">
+                <span>🕐 ${new Date(snapshot.timestamp).toLocaleString()}</span>
+                <span class="game-score">$${snapshot.price.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                <span>${snapshot.symbol}</span>
+            </div>
+            <div class="game-status">
+                High: $${snapshot.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2})} |
+                Low: $${snapshot.lowPrice.toLocaleString('en-US', {minimumFractionDigits: 2})} |
+                Trades: ${snapshot.totalTrades.toLocaleString()}
+            </div>
+        </div>
+    `).join('');
+
+    cryptoData.innerHTML = html;
+}
+
+async function filterCryptoByDate() {
+    const dateFilter = document.getElementById('cryptoDateFilter').value;
+
+    if (!dateFilter) {
+        alert('Please select a date');
+        return;
+    }
+
+    // Convert to date range (full day)
+    const startDate = new Date(dateFilter + 'T00:00:00Z').toISOString();
+    const endDate = new Date(dateFilter + 'T23:59:59Z').toISOString();
+
+    try {
+        const response = await fetch(
+            `${PING_SERVICE_URL}/api/crypto/snapshots/range?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+        );
+
+        if (response.ok) {
+            const snapshots = await response.json();
+            displayCryptoSnapshots(snapshots);
+        } else {
+            alert('Failed to filter crypto data');
+        }
+    } catch (error) {
+        console.error('Error filtering crypto data:', error);
+        alert('Error filtering crypto data');
+    }
+}
+
+function showAllCryptoData() {
+    document.getElementById('cryptoDateFilter').value = '';
+    loadCryptoSnapshots();
+}
+
+// ============================================================================
+// Tab Switching Functionality
+// ============================================================================
+
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Update tab panels
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+
+    // Activate selected tab
+    if (tabName === 'ping') {
+        document.getElementById('pingTab').classList.add('active');
+        document.getElementById('pingPanel').classList.add('active');
+    } else if (tabName === 'crypto') {
+        document.getElementById('cryptoTab').classList.add('active');
+        document.getElementById('cryptoPanel').classList.add('active');
+    } else if (tabName === 'sports') {
+        document.getElementById('sportsTab').classList.add('active');
+        document.getElementById('sportsPanel').classList.add('active');
+        updateHistorySummary();
+    }
 }
 
 // ============================================================================
 // Theme & Customization Features
 // ============================================================================
 
-// Theme Presets
+// Professional Theme Presets
 const THEME_PRESETS = {
-    'cozy-cafe': {
-        color1: '#2c1810',
-        color2: '#1a0f0a',
-        primaryColor: '#d4a574',
-        successColor: '#7fc8a9',
-        warningColor: '#f0b67f',
-        dangerColor: '#e17b77',
-        infoColor: '#89b4f8'
-    },
-    'midnight-coder': {
-        color1: '#0f0f23',
-        color2: '#1a1a2e',
-        primaryColor: '#64b5f6',
-        successColor: '#81c784',
-        warningColor: '#ffb74d',
-        dangerColor: '#e57373',
-        infoColor: '#ba68c8'
-    },
-    'forest-retreat': {
-        color1: '#1a2f1a',
-        color2: '#0d1f0d',
-        primaryColor: '#8bc34a',
-        successColor: '#4caf50',
-        warningColor: '#ffb300',
-        dangerColor: '#f4511e',
-        infoColor: '#26c6da'
-    },
-    'sunset-lounge': {
-        color1: '#2d1b2e',
-        color2: '#1f0d1f',
-        primaryColor: '#ff7043',
-        successColor: '#66bb6a',
-        warningColor: '#ffca28',
-        dangerColor: '#ef5350',
-        infoColor: '#ab47bc'
-    },
-    'ocean-breeze': {
-        color1: '#0d1f2d',
-        color2: '#081220',
-        primaryColor: '#4dd0e1',
-        successColor: '#26a69a',
-        warningColor: '#ffa726',
-        dangerColor: '#ef5350',
-        infoColor: '#5c6bc0'
-    },
-    'lavender-dreams': {
-        color1: '#2d1f3f',
-        color2: '#1a0f2e',
-        primaryColor: '#ce93d8',
-        successColor: '#81c784',
-        warningColor: '#ffb74d',
-        dangerColor: '#ef5350',
+    'executive-dark': {
+        color1: '#1a1d29',
+        color2: '#0f1117',
+        primaryColor: '#5b9bd5',
+        successColor: '#70ad47',
+        warningColor: '#ffc000',
+        dangerColor: '#e74c3c',
         infoColor: '#7986cb'
     },
-    'retro-synthwave': {
-        color1: '#1a0033',
-        color2: '#2d0052',
-        primaryColor: '#ff00ff',
-        successColor: '#00ff00',
-        warningColor: '#ffff00',
-        dangerColor: '#ff0055',
-        infoColor: '#00ffff'
+    'corporate-blue': {
+        color1: '#1e3a5f',
+        color2: '#0f1e3a',
+        primaryColor: '#4a90e2',
+        successColor: '#7cb342',
+        warningColor: '#fb8c00',
+        dangerColor: '#e53935',
+        infoColor: '#5c6bc0'
     },
-    'minimal-zen': {
-        color1: '#2b2d2f',
-        color2: '#1a1c1e',
-        primaryColor: '#a8a8a8',
-        successColor: '#7a9d96',
-        warningColor: '#c4a57b',
-        dangerColor: '#b47f7f',
-        infoColor: '#8b9bb3'
+    'clean-light': {
+        color1: '#e8eaf6',
+        color2: '#c5cae9',
+        primaryColor: '#3f51b5',
+        successColor: '#43a047',
+        warningColor: '#fb8c00',
+        dangerColor: '#e53935',
+        infoColor: '#5c6bc0'
+    },
+    'minimalist-slate': {
+        color1: '#37474f',
+        color2: '#263238',
+        primaryColor: '#78909c',
+        successColor: '#66bb6a',
+        warningColor: '#ffb74d',
+        dangerColor: '#ef5350',
+        infoColor: '#90a4ae'
+    },
+    'professional-navy': {
+        color1: '#0d1b2a',
+        color2: '#1b263b',
+        primaryColor: '#4a7ba7',
+        successColor: '#52b788',
+        warningColor: '#f77f00',
+        dangerColor: '#d62828',
+        infoColor: '#6c757d'
+    },
+    'modern-charcoal': {
+        color1: '#2d3436',
+        color2: '#1e272e',
+        primaryColor: '#74b9ff',
+        successColor: '#55efc4',
+        warningColor: '#fdcb6e',
+        dangerColor: '#ff7675',
+        infoColor: '#a29bfe'
     }
 };
 
@@ -596,73 +1376,6 @@ function hexToRgb(hex) {
     } : null;
 }
 
-// Toggle Particles
-let particlesInterval = null;
-function toggleParticles() {
-    const enabled = document.getElementById('particlesEnabled').checked;
-    const container = document.getElementById('particlesContainer');
-
-    if (enabled) {
-        container.classList.add('active');
-        startParticles();
-    } else {
-        container.classList.remove('active');
-        stopParticles();
-    }
-
-    saveSettings();
-}
-
-// Initialize Particles
-function initializeParticles() {
-    // Particles will start if enabled in saved settings
-    const enabled = document.getElementById('particlesEnabled').checked;
-    if (enabled) {
-        startParticles();
-    }
-}
-
-// Start Particles Animation
-function startParticles() {
-    if (particlesInterval) return;
-
-    const container = document.getElementById('particlesContainer');
-
-    particlesInterval = setInterval(() => {
-        const particle = document.createElement('div');
-        particle.className = 'particle';
-
-        // Random position
-        particle.style.left = Math.random() * 100 + '%';
-
-        // Random animation duration (10-20 seconds)
-        const duration = 10 + Math.random() * 10;
-        particle.style.animationDuration = duration + 's';
-
-        // Random size (2-6px)
-        const size = 2 + Math.random() * 4;
-        particle.style.width = size + 'px';
-        particle.style.height = size + 'px';
-
-        container.appendChild(particle);
-
-        // Remove particle after animation
-        setTimeout(() => {
-            particle.remove();
-        }, duration * 1000);
-    }, 300);
-}
-
-// Stop Particles Animation
-function stopParticles() {
-    if (particlesInterval) {
-        clearInterval(particlesInterval);
-        particlesInterval = null;
-    }
-
-    const container = document.getElementById('particlesContainer');
-    container.innerHTML = '';
-}
 
 // Toggle Blur Effect
 function toggleBlur() {
@@ -719,7 +1432,6 @@ function saveSettings() {
         bgColor1: document.getElementById('customColor1').value,
         bgColor2: document.getElementById('customColor2').value,
         gradientAngle: document.getElementById('gradientAngle').value,
-        particlesEnabled: document.getElementById('particlesEnabled').checked,
         blurEnabled: document.getElementById('blurEnabled').checked,
         animationsEnabled: document.getElementById('animationsEnabled').checked,
         panelOpacity: document.getElementById('panelOpacity').value
@@ -748,16 +1460,11 @@ function loadSavedSettings() {
             document.getElementById('opacityValue').textContent = settings.panelOpacity;
         }
 
-        document.getElementById('particlesEnabled').checked = settings.particlesEnabled || false;
         document.getElementById('blurEnabled').checked = settings.blurEnabled !== false;
         document.getElementById('animationsEnabled').checked = settings.animationsEnabled !== false;
 
         // Apply settings
         applyCustomGradient();
-
-        if (settings.particlesEnabled) {
-            toggleParticles();
-        }
 
         if (settings.blurEnabled === false) {
             toggleBlur();
@@ -782,26 +1489,20 @@ function resetSettings() {
     // Clear localStorage
     localStorage.removeItem('codexeterna_settings');
 
-    // Reset to Cozy Café theme
-    applyPreset('cozy-cafe');
+    // Reset to Executive Dark theme
+    applyPreset('executive-dark');
 
     // Reset controls
     document.getElementById('gradientAngle').value = 135;
     document.getElementById('angleValue').textContent = 135;
     document.getElementById('panelOpacity').value = 95;
     document.getElementById('opacityValue').textContent = 95;
-    document.getElementById('particlesEnabled').checked = false;
     document.getElementById('blurEnabled').checked = true;
     document.getElementById('animationsEnabled').checked = true;
 
-    // Disable particles
-    if (particlesInterval) {
-        toggleParticles();
-    }
-
     // Reset effects
     document.body.classList.remove('blur-disabled', 'animations-disabled');
-    document.documentElement.style.setProperty('--blur-amount', '12px');
+    document.documentElement.style.setProperty('--blur-amount', '10px');
     document.documentElement.style.setProperty('--animation-enabled', '1');
 
     updateOpacity();
@@ -813,22 +1514,51 @@ function resetSettings() {
 // Expose functions globally for onclick handlers
 // ============================================================================
 
+// Core functions
 window.togglePause = togglePause;
 window.resetSystem = resetSystem;
 window.reconnect = reconnect;
 window.searchCoordinates = searchCoordinates;
-window.loadTopCoordinates = loadTopCoordinates;
 window.fetchSportsData = fetchSportsData;
 window.loadStoredGames = loadStoredGames;
+
+// Ping control functions
+window.startPingSystem = startPingSystem;
+window.stopPingSystem = stopPingSystem;
+window.sortTable = sortTable;
+window.clearSavedData = clearSavedData;
+
+// Crypto control functions
+window.startCryptoSystem = startCryptoSystem;
+window.stopCryptoSystem = stopCryptoSystem;
+window.loadCryptoSnapshots = loadCryptoSnapshots;
+window.filterCryptoByDate = filterCryptoByDate;
+window.showAllCryptoData = showAllCryptoData;
+
+// Tab navigation
+window.switchTab = switchTab;
+
+// Sports history functions
+window.filterSportsByDate = filterSportsByDate;
+window.showAllSportsData = showAllSportsData;
+window.clearSportsHistory = clearSportsHistory;
+window.updateHistorySummary = updateHistorySummary;
 
 // Customization functions
 window.toggleSettings = toggleSettings;
 window.applyPreset = applyPreset;
 window.applyCustomGradient = applyCustomGradient;
-window.toggleParticles = toggleParticles;
 window.toggleBlur = toggleBlur;
 window.toggleAnimations = toggleAnimations;
 window.updateOpacity = updateOpacity;
 window.resetSettings = resetSettings;
 
-console.log('Dashboard JavaScript with Customization loaded successfully');
+console.log('==================================================');
+console.log('CodexEterna Data Pipeline v2.0 - UI Loaded');
+console.log('==================================================');
+console.log('✅ Ping System (20k/sec) - Ready');
+console.log('✅ Crypto Monitoring (Binance) - Ready');
+console.log('✅ Sports Data Feed (ESPN) - Ready');
+console.log('==================================================');
+console.log('⚠️  All systems require MANUAL START');
+console.log('==================================================');

@@ -19,7 +19,8 @@ public class PingGeneratorService : BackgroundService
     private readonly ConcurrentDictionary<string, CoordinatePing> _coordinateCounts;
 
     // Control flags
-    private volatile bool _isPaused = false;
+    private volatile bool _isPaused = true; // Start paused - require manual start
+    private volatile bool _isRunning = false; // Track if system has been started
     private long _totalPingsGenerated = 0;
     private DateTime _startTime;
     private readonly Stopwatch _stopwatch;
@@ -389,21 +390,57 @@ public class PingGeneratorService : BackgroundService
     }
 
     /// <summary>
-    /// Pause ping generation
+    /// Start the ping generation system (requires manual activation)
     /// </summary>
-    public void Pause()
+    public void Start()
     {
-        _isPaused = true;
-        _logger.LogInformation("Ping generation PAUSED");
+        if (!_isRunning)
+        {
+            _isRunning = true;
+            _isPaused = false;
+            _startTime = DateTime.UtcNow;
+            _stopwatch.Start();
+            _logger.LogInformation("Ping generation STARTED - System is now collecting data at {Rate} pings/second", TARGET_PINGS_PER_SECOND);
+        }
+        else
+        {
+            Resume();
+        }
     }
 
     /// <summary>
-    /// Resume ping generation
+    /// Stop the ping generation system immediately
+    /// </summary>
+    public void Stop()
+    {
+        _isPaused = true;
+        _isRunning = false;
+        _stopwatch.Stop();
+        _logger.LogInformation("Ping generation STOPPED - All operations ceased immediately");
+    }
+
+    /// <summary>
+    /// Pause ping generation (temporary)
+    /// </summary>
+    public void Pause()
+    {
+        if (_isRunning)
+        {
+            _isPaused = true;
+            _logger.LogInformation("Ping generation PAUSED");
+        }
+    }
+
+    /// <summary>
+    /// Resume ping generation (only if system is running)
     /// </summary>
     public void Resume()
     {
-        _isPaused = false;
-        _logger.LogInformation("Ping generation RESUMED");
+        if (_isRunning)
+        {
+            _isPaused = false;
+            _logger.LogInformation("Ping generation RESUMED");
+        }
     }
 
     /// <summary>
@@ -418,5 +455,14 @@ public class PingGeneratorService : BackgroundService
         _logger.LogInformation("Ping generation RESET");
     }
 
+    /// <summary>
+    /// Get all unique coordinates (for comprehensive mapping)
+    /// </summary>
+    public IEnumerable<CoordinatePing> GetAllCoordinates()
+    {
+        return _coordinateCounts.Values;
+    }
+
     public bool IsPaused => _isPaused;
+    public bool IsRunning => _isRunning;
 }

@@ -143,11 +143,51 @@ public class PingController : ControllerBase
     }
 
     /// <summary>
+    /// Start ping generation (requires manual confirmation from user)
+    /// </summary>
+    [HttpPost("start")]
+    public IActionResult Start()
+    {
+        if (_pingService.IsRunning)
+            return BadRequest(new { message = "Ping generation is already running", status = "running" });
+
+        _pingService.Start();
+        _logger.LogInformation("Ping generation STARTED via API - Data collection initiated");
+
+        return Ok(new {
+            message = "Ping generation started - System is now collecting 20,000 pings/second",
+            status = "running",
+            warning = "Large amounts of data will be collected. Use STOP to cease immediately."
+        });
+    }
+
+    /// <summary>
+    /// Stop ping generation immediately (ceases all operations)
+    /// </summary>
+    [HttpPost("stop")]
+    public IActionResult Stop()
+    {
+        if (!_pingService.IsRunning)
+            return BadRequest(new { message = "Ping generation is not running", status = "stopped" });
+
+        _pingService.Stop();
+        _logger.LogInformation("Ping generation STOPPED via API - All operations ceased");
+
+        return Ok(new {
+            message = "Ping generation stopped - All data collection ceased immediately",
+            status = "stopped"
+        });
+    }
+
+    /// <summary>
     /// Pause ping generation
     /// </summary>
     [HttpPost("pause")]
     public IActionResult Pause()
     {
+        if (!_pingService.IsRunning)
+            return BadRequest(new { message = "Cannot pause - system is not running" });
+
         if (_pingService.IsPaused)
             return BadRequest(new { message = "Already paused" });
 
@@ -203,6 +243,19 @@ public class PingController : ControllerBase
     }
 
     /// <summary>
+    /// Get all unique coordinates (for comprehensive mapping)
+    /// </summary>
+    [HttpGet("all")]
+    public ActionResult<IEnumerable<CoordinatePing>> GetAllCoordinates([FromQuery] int limit = 100000)
+    {
+        if (limit < 1 || limit > 1000000)
+            return BadRequest("Limit must be between 1 and 1,000,000");
+
+        var results = _pingService.GetAllCoordinates().Take(limit);
+        return Ok(results);
+    }
+
+    /// <summary>
     /// Health check endpoint
     /// </summary>
     [HttpGet("health")]
@@ -212,9 +265,12 @@ public class PingController : ControllerBase
         return Ok(new
         {
             status = "healthy",
+            isRunning = _pingService.IsRunning,
             isPaused = stats.IsPaused,
             uptime = stats.Uptime.ToString(),
-            pingsPerSecond = stats.PingsPerSecond
+            pingsPerSecond = stats.PingsPerSecond,
+            totalPings = stats.TotalPingsGenerated,
+            uniqueCoordinates = stats.UniqueCoordinates
         });
     }
 }
