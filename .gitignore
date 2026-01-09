@@ -24,8 +24,7 @@ ENV/
 .coverage
 htmlcov/
 
-# IDE ignores
-.vscode/
+# IDE ignores (keep .vscode/ for VS Code tasks and configuration)
 .idea/
 *.swp
 *.swo

@@ -3,14 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Data Pipeline Dashboard</title>
+    <title>CodexEterna - Real-Time Data Pipeline</title>
     <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Settings Button (Floating) -->
+    <button class="settings-btn" id="settingsBtn" onclick="toggleSettings()" title="Customize Background">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 1v6m0 6v6m0-18a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"></path>
+            <path d="M21 12h-6m-6 0H3"></path>
+        </svg>
+    </button>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-header">
+            <h3>🎨 Customize Your Vibe</h3>
+            <button class="close-btn" onclick="toggleSettings()">×</button>
+        </div>
+
+        <div class="settings-content">
+            <!-- Background Presets -->
+            <div class="setting-group">
+                <label>Background Vibes</label>
+                <div class="preset-grid">
+                    <button class="preset-btn" onclick="applyPreset('cozy-cafe')">
+                        <span>☕</span>
+                        <span>Cozy Café</span>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('midnight-coder')">
+                        <span>🌙</span>
+                        <span>Midnight</span>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('forest-retreat')">
+                        <span>🌲</span>
+                        <span>Forest</span>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('sunset-lounge')">
+                        <span>🌅</span>
+                        <span>Sunset</span>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('ocean-breeze')">
+                        <span>🌊</span>
+                        <span>Ocean</span>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('lavender-dreams')">
+                        <span>💜</span>
+                        <span>Lavender</span>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('retro-synthwave')">
+                        <span>🌃</span>
+                        <span>Synthwave</span>
+                    </button>
+                    <button class="preset-btn" onclick="applyPreset('minimal-zen')">
+                        <span>🧘</span>
+                        <span>Zen</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Colors -->
+            <div class="setting-group">
+                <label>Custom Gradient</label>
+                <div class="color-pickers">
+                    <div class="color-picker-group">
+                        <label>Color 1</label>
+                        <input type="color" id="customColor1" value="#1a1a2e" onchange="applyCustomGradient()">
+                    </div>
+                    <div class="color-picker-group">
+                        <label>Color 2</label>
+                        <input type="color" id="customColor2" value="#16213e" onchange="applyCustomGradient()">
+                    </div>
+                </div>
+                <div class="slider-group">
+                    <label>Gradient Angle: <span id="angleValue">135</span>°</label>
+                    <input type="range" id="gradientAngle" min="0" max="360" value="135" oninput="applyCustomGradient()">
+                </div>
+            </div>
+
+            <!-- Background Effects -->
+            <div class="setting-group">
+                <label>Effects</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="particlesEnabled" onchange="toggleParticles()">
+                        <span>Floating Particles</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="blurEnabled" checked onchange="toggleBlur()">
+                        <span>Glass Blur Effect</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="animationsEnabled" checked onchange="toggleAnimations()">
+                        <span>Smooth Animations</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Opacity Control -->
+            <div class="setting-group">
+                <label>Panel Transparency: <span id="opacityValue">95</span>%</label>
+                <input type="range" id="panelOpacity" min="70" max="100" value="95" oninput="updateOpacity()">
+            </div>
+
+            <!-- Reset Button -->
+            <button class="btn btn-reset" onclick="resetSettings()">Reset to Default</button>
+        </div>
+    </div>
+
+    <!-- Particles Background -->
+    <div class="particles-container" id="particlesContainer"></div>
+
+    <!-- Main Container -->
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <h1>Real-Time Data Pipeline Dashboard</h1>
+            <div class="logo-section">
+                <h1>CodexEterna</h1>
+                <div class="tagline">Real-Time Data Pipeline</div>
+            </div>
             <div class="header-subtitle">
                 Hybrid C# + Python Microservices Architecture
             </div>
@@ -22,7 +137,7 @@
             <!-- Left Panel: Coordinate Ping System -->
             <div class="panel ping-panel">
                 <div class="panel-header">
-                    <h2>Coordinate Ping Stream</h2>
+                    <h2>📍 Coordinate Ping Stream</h2>
                     <div class="status-indicator" id="pingStatus">
                         <span class="status-dot running"></span>
                         <span class="status-text">Running</span>
@@ -36,7 +151,7 @@
                         <div class="stat-value" id="totalPings">0</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">Unique Coordinates</div>
+                        <div class="stat-label">Unique Coords</div>
                         <div class="stat-value" id="uniqueCoords">0</div>
                     </div>
                     <div class="stat-card">
@@ -60,18 +175,18 @@
                 <!-- Controls -->
                 <div class="controls">
                     <button class="btn btn-warning" id="pauseBtn" onclick="togglePause()">
-                        <span id="pauseBtnText">Pause</span>
+                        <span id="pauseBtnText">⏸ Pause</span>
                     </button>
-                    <button class="btn btn-danger" id="resetBtn" onclick="resetSystem()">Reset</button>
-                    <button class="btn btn-primary" id="reconnectBtn" onclick="reconnect()">Reconnect</button>
+                    <button class="btn btn-danger" id="resetBtn" onclick="resetSystem()">🔄 Reset</button>
+                    <button class="btn btn-primary" id="reconnectBtn" onclick="reconnect()">🔌 Reconnect</button>
                 </div>
 
                 <!-- Search/Filter -->
                 <div class="search-section">
                     <input type="text" id="searchInput" placeholder="Search coordinates (e.g., 33.42, -111.83)"
                            class="search-input">
-                    <button class="btn btn-secondary" onclick="searchCoordinates()">Search</button>
-                    <button class="btn btn-secondary" onclick="loadTopCoordinates()">Top 100</button>
+                    <button class="btn btn-secondary" onclick="searchCoordinates()">🔍 Search</button>
+                    <button class="btn btn-secondary" onclick="loadTopCoordinates()">⭐ Top 100</button>
                 </div>
 
                 <!-- Coordinate Data Table -->
@@ -98,7 +213,7 @@
             <!-- Right Panel: Sports Data System -->
             <div class="panel sports-panel">
                 <div class="panel-header">
-                    <h2>Sports Data Feed</h2>
+                    <h2>🏆 Sports Data Feed</h2>
                     <div class="status-indicator" id="sportsStatus">
                         <span class="status-dot"></span>
                         <span class="status-text">Ready</span>
@@ -111,16 +226,16 @@
                         <label>Select Sport:</label>
                         <select id="sportSelect" class="sport-select">
                             <option value="">Choose a sport...</option>
-                            <option value="football/nfl">NFL Football</option>
-                            <option value="basketball/nba">NBA Basketball</option>
-                            <option value="baseball/mlb">MLB Baseball</option>
-                            <option value="hockey/nhl">NHL Hockey</option>
-                            <option value="soccer/usa.1">MLS Soccer</option>
-                            <option value="basketball/wnba">WNBA Basketball</option>
+                            <option value="football/nfl">🏈 NFL Football</option>
+                            <option value="basketball/nba">🏀 NBA Basketball</option>
+                            <option value="baseball/mlb">⚾ MLB Baseball</option>
+                            <option value="hockey/nhl">🏒 NHL Hockey</option>
+                            <option value="soccer/usa.1">⚽ MLS Soccer</option>
+                            <option value="basketball/wnba">🏀 WNBA Basketball</option>
                         </select>
                     </div>
-                    <button class="btn btn-success" onclick="fetchSportsData()">Fetch Latest</button>
-                    <button class="btn btn-secondary" onclick="loadStoredGames()">Load Stored</button>
+                    <button class="btn btn-success" onclick="fetchSportsData()">📡 Fetch Latest</button>
+                    <button class="btn btn-secondary" onclick="loadStoredGames()">💾 Load Stored</button>
                 </div>
 
                 <!-- Sports Data Display -->
@@ -135,9 +250,9 @@
         <!-- Footer -->
         <footer class="footer">
             <div class="footer-content">
-                <div>Real-Time Data Pipeline | Microservices Architecture</div>
-                <div>C# Ping Service: <span id="pingServiceUrl">http://localhost:5000</span></div>
-                <div>Python Sports Service: <span id="sportsServiceUrl">http://localhost:5001</span></div>
+                <div>🚀 Real-Time Data Pipeline | Microservices Architecture</div>
+                <div>C# Ping Service: <span id="pingServiceUrl">localhost:5000</span></div>
+                <div>Python Sports Service: <span id="sportsServiceUrl">localhost:5001</span></div>
             </div>
         </footer>
     </div>
