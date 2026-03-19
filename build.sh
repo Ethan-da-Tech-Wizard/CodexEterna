@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# build.sh  —  Builds the CodexEterna desktop app for macOS / Linux
+# build.sh  —  Builds CodexEterna into a single portable binary
 #
-# Requirements (install once):
-#   • Node.js 18+      https://nodejs.org
-#   • .NET 7 SDK       https://dotnet.microsoft.com/download
-#   • Python 3.11+     https://python.org
-#   • pip install pyinstaller
+# Requirements (install once on THIS build machine, not on the target):
+#   • Python 3.11+   https://python.org
 #
 # Run:
-#   chmod +x build.sh
-#   ./build.sh
+#   chmod +x build.sh && ./build.sh
 #
 # Output:
-#   dist/CodexEterna-1.0.0.dmg       (macOS)
-#   dist/CodexEterna-1.0.0.AppImage  (Linux)
+#   dist/CodexEterna          (macOS / Linux — share this file with anyone)
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
@@ -23,72 +18,52 @@ cd "$ROOT"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   CodexEterna — Desktop App Builder      ║"
+echo "║   CodexEterna — Portable App Builder     ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
-# ── Step 1: Build the C# PingService ─────────────────────────────────────────
-echo "▶ Step 1/4  Building C# PingService (self-contained)…"
-cd "$ROOT/PingService"
-
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  RID="osx-x64"
-else
-  RID="linux-x64"
+# ── Check Python ──────────────────────────────────────────────────────────────
+if ! command -v python3 &>/dev/null; then
+  echo "ERROR: Python 3 not found."
+  echo "Install Python 3.11+ from https://python.org"
+  exit 1
 fi
 
-dotnet publish -c Release -r "$RID" --self-contained true \
-  -p:PublishSingleFile=true \
-  -p:PublishTrimmed=false \
-  -o "$ROOT/PingService/bin/Release/net7.0/publish"
-
-echo "   ✅ PingService built"
-
-# ── Step 2: Build the Python SportsService ───────────────────────────────────
-echo ""
-echo "▶ Step 2/4  Building Python SportsService (PyInstaller)…"
-cd "$ROOT/SportsService"
-
-# Install deps into a local venv for a clean build
+# ── Step 1: Create venv ───────────────────────────────────────────────────────
+echo "▶ Step 1/3  Setting up Python environment…"
 python3 -m venv .build-venv
 source .build-venv/bin/activate
+pip install --quiet --upgrade pip
 pip install --quiet -r requirements.txt pyinstaller
+echo "   ✅ Environment ready"
+
+# ── Step 2: Build ─────────────────────────────────────────────────────────────
+echo ""
+echo "▶ Step 2/3  Building portable binary…"
 
 pyinstaller --onefile \
-  --name SportsService \
+  --name CodexEterna \
   --distpath dist \
-  --hidden-import uvicorn.logging \
-  --hidden-import uvicorn.loops \
-  --hidden-import uvicorn.loops.auto \
-  --hidden-import uvicorn.protocols \
-  --hidden-import uvicorn.protocols.http \
-  --hidden-import uvicorn.protocols.http.auto \
-  --hidden-import uvicorn.protocols.websockets \
-  --hidden-import uvicorn.protocols.websockets.auto \
-  --hidden-import uvicorn.lifespan \
-  --hidden-import uvicorn.lifespan.on \
-  --hidden-import sqlalchemy.dialects.sqlite \
-  run.py
+  --add-data "templates:templates" \
+  --add-data "static:static" \
+  --hidden-import flask_socketio \
+  --hidden-import engineio \
+  --hidden-import engineio.async_drivers.threading \
+  --hidden-import socketio \
+  app.py
 
 deactivate
-echo "   ✅ SportsService built → dist/SportsService"
+echo "   ✅ Build complete → dist/CodexEterna"
 
-# ── Step 3: Install Electron dependencies ────────────────────────────────────
-echo ""
-echo "▶ Step 3/4  Installing Electron dependencies…"
-cd "$ROOT/electron"
-npm install --silent
-echo "   ✅ Node modules ready"
-
-# ── Step 4: Package into installer ───────────────────────────────────────────
-echo ""
-echo "▶ Step 4/4  Packaging Electron app…"
-npm run "build:$([ "$OSTYPE" == "darwin"* ] && echo mac || echo linux)"
-
+# ── Step 3: Done ──────────────────────────────────────────────────────────────
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   ✅  Build complete!                    ║"
-echo "║   Output: dist/                          ║"
+echo "║   Done!                                  ║"
+echo "║                                          ║"
+echo "║   Your file:  dist/CodexEterna           ║"
+echo "║                                          ║"
+echo "║   Send that file to anyone.              ║"
+echo "║   They just double-click it — done.      ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 ls -lh "$ROOT/dist/"

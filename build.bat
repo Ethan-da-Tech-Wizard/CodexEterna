@@ -1,17 +1,15 @@
 @echo off
 REM ─────────────────────────────────────────────────────────────────────────────
-REM build.bat  —  Builds the CodexEterna desktop app for Windows
+REM build.bat  —  Builds CodexEterna into a single portable .exe
 REM
-REM Requirements (install once, then restart your PC):
-REM   • Node.js 18+   https://nodejs.org        (check "Add to PATH" during install)
-REM   • .NET 7 SDK    https://dotnet.microsoft.com/download
-REM   • Python 3.11+  https://python.org        (check "Add to PATH" during install)
+REM Requirements (install once on THIS build machine, not on the target):
+REM   • Python 3.11+  https://python.org  — tick "Add to PATH" during install
 REM
 REM Run:
 REM   Double-click build.bat   OR   open Command Prompt here and type: build.bat
 REM
 REM Output:
-REM   dist\CodexEterna Setup 1.0.0.exe
+REM   dist\CodexEterna.exe   (share this file with anyone — no installs needed)
 REM ─────────────────────────────────────────────────────────────────────────────
 
 setlocal enabledelayedexpansion
@@ -20,96 +18,62 @@ cd /d "%ROOT%"
 
 echo.
 echo ╔══════════════════════════════════════════╗
-echo ║   CodexEterna — Desktop App Builder      ║
+echo ║   CodexEterna — Portable App Builder     ║
 echo ╚══════════════════════════════════════════╝
 echo.
 
-REM ── Step 1: Build C# PingService ─────────────────────────────────────────
-echo [1/4] Building C# PingService...
-cd /d "%ROOT%PingService"
-
-dotnet publish -c Release -r win-x64 --self-contained true ^
-  -p:PublishSingleFile=true ^
-  -p:PublishTrimmed=false ^
-  -o "%ROOT%PingService\bin\Release\net7.0\publish"
-
+REM ── Check Python ─────────────────────────────────────────────────────────
+python --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo ERROR: PingService build failed.
-    echo Make sure .NET 7 SDK is installed: https://dotnet.microsoft.com/download
+    echo ERROR: Python not found.
+    echo Install Python 3.11+ from https://python.org
+    echo Make sure to tick "Add to PATH" during install, then restart this window.
     pause
     exit /b 1
 )
-echo    OK  PingService built
 
-REM ── Step 2: Build Python SportsService ───────────────────────────────────
-echo.
-echo [2/4] Building Python SportsService...
-cd /d "%ROOT%SportsService"
-
+REM ── Step 1: Create venv ───────────────────────────────────────────────────
+echo [1/3] Setting up Python environment...
 python -m venv .build-venv
 call .build-venv\Scripts\activate.bat
+pip install --quiet --upgrade pip
 pip install --quiet -r requirements.txt pyinstaller
+echo    OK  Environment ready
 
+REM ── Step 2: Build ─────────────────────────────────────────────────────────
+echo.
+echo [2/3] Building portable executable...
 pyinstaller --onefile ^
-  --name SportsService ^
+  --name CodexEterna ^
   --distpath dist ^
-  --hidden-import uvicorn.logging ^
-  --hidden-import uvicorn.loops ^
-  --hidden-import uvicorn.loops.auto ^
-  --hidden-import uvicorn.protocols ^
-  --hidden-import uvicorn.protocols.http ^
-  --hidden-import uvicorn.protocols.http.auto ^
-  --hidden-import uvicorn.protocols.websockets ^
-  --hidden-import uvicorn.protocols.websockets.auto ^
-  --hidden-import uvicorn.lifespan ^
-  --hidden-import uvicorn.lifespan.on ^
-  --hidden-import sqlalchemy.dialects.sqlite ^
-  run.py
+  --add-data "templates;templates" ^
+  --add-data "static;static" ^
+  --hidden-import flask_socketio ^
+  --hidden-import engineio ^
+  --hidden-import engineio.async_drivers.threading ^
+  --hidden-import socketio ^
+  app.py
 
 call .build-venv\Scripts\deactivate.bat
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo ERROR: SportsService build failed.
-    echo Make sure Python 3.11+ is installed: https://python.org
-    pause
-    exit /b 1
-)
-echo    OK  SportsService built
-
-REM ── Step 3: Install Electron deps ────────────────────────────────────────
-echo.
-echo [3/4] Installing Electron dependencies...
-cd /d "%ROOT%electron"
-npm install
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo ERROR: npm install failed.
-    echo Make sure Node.js 18+ is installed: https://nodejs.org
-    pause
-    exit /b 1
-)
-echo    OK  Node modules ready
-
-REM ── Step 4: Package ──────────────────────────────────────────────────────
-echo.
-echo [4/4] Packaging Electron app...
-npm run build:win
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo ERROR: Electron packaging failed.
+    echo ERROR: Build failed.
     pause
     exit /b 1
 )
 
+echo    OK  Build complete
+
+REM ── Step 3: Done ─────────────────────────────────────────────────────────
 echo.
 echo ╔══════════════════════════════════════════╗
-echo ║   Build complete!                        ║
-echo ║   Open the  dist\  folder to find        ║
-echo ║   your installer .exe                    ║
+echo ║   Done!                                  ║
+echo ║                                          ║
+echo ║   Your file:  dist\CodexEterna.exe       ║
+echo ║                                          ║
+echo ║   Send that file to anyone.              ║
+echo ║   They just double-click it — done.      ║
 echo ╚══════════════════════════════════════════╝
 echo.
 explorer "%ROOT%dist"

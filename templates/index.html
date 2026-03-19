@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodexEterna — Live Data Dashboard</title>
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+</head>
+<body>
+  <header>
+    <h1>CodexEterna</h1>
+    <span id="connection-status" class="badge badge-offline">Connecting…</span>
+  </header>
+
+  <main class="grid">
+
+    <!-- ── LEFT: Coordinate Pings ───────────────────────────────────────── -->
+    <section class="card" id="ping-panel">
+      <h2>Coordinate Pings</h2>
+
+      <!-- Stats bar -->
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat-value" id="total-pings">0</span>
+          <span class="stat-label">Total Pings</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="unique-coords">0</span>
+          <span class="stat-label">Unique Coords</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="pings-per-sec">0</span>
+          <span class="stat-label">Pings / sec</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value" id="uptime">0s</span>
+          <span class="stat-label">Uptime</span>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <button id="btn-pause"  class="btn btn-warn">Pause</button>
+        <button id="btn-resume" class="btn btn-ok"   disabled>Resume</button>
+        <button id="btn-reset"  class="btn btn-danger">Reset</button>
+      </div>
+
+      <!-- Filters -->
+      <details class="filter-box">
+        <summary>Filters</summary>
+        <div class="filter-grid">
+          <label>Hemisphere
+            <select id="f-hemisphere">
+              <option value="">All</option>
+              <option value="north">North</option>
+              <option value="south">South</option>
+              <option value="east">East</option>
+              <option value="west">West</option>
+              <option value="northeast">NE</option>
+              <option value="northwest">NW</option>
+              <option value="southeast">SE</option>
+              <option value="southwest">SW</option>
+            </select>
+          </label>
+          <label>Min count
+            <input type="number" id="f-min-count" placeholder="0" min="0" />
+          </label>
+          <label>Max count
+            <input type="number" id="f-max-count" placeholder="∞" min="0" />
+          </label>
+          <label>Limit
+            <input type="number" id="f-limit" value="100" min="1" max="1000" />
+          </label>
+        </div>
+        <div class="filter-grid">
+          <label>Min lat <input type="number" id="f-min-lat" placeholder="-90" step="0.01" /></label>
+          <label>Max lat <input type="number" id="f-max-lat" placeholder="90"  step="0.01" /></label>
+          <label>Min lon <input type="number" id="f-min-lon" placeholder="-180" step="0.01" /></label>
+          <label>Max lon <input type="number" id="f-max-lon" placeholder="180"  step="0.01" /></label>
+        </div>
+        <button class="btn btn-primary" id="btn-apply-ping-filter">Apply Filter</button>
+        <button class="btn"             id="btn-clear-ping-filter">Clear</button>
+      </details>
+
+      <!-- Aggregate -->
+      <div class="agg-row">
+        <span>Group by:</span>
+        <button class="btn btn-sm" onclick="loadPingAggregate('hemisphere')">Hemisphere</button>
+        <button class="btn btn-sm" onclick="loadPingAggregate('quadrant')">Quadrant</button>
+        <button class="btn btn-sm" onclick="loadPingAggregate('count_range')">Count Range</button>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <table id="ping-table">
+          <thead>
+            <tr><th>#</th><th>Coordinate</th><th>Count</th><th>Hemisphere</th></tr>
+          </thead>
+          <tbody id="ping-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── RIGHT: Sports Data ────────────────────────────────────────────── -->
+    <section class="card" id="sports-panel">
+      <h2>Live Sports Data</h2>
+
+      <!-- League picker + fetch -->
+      <div class="controls">
+        <select id="sport-league">
+          <option value="football/nfl">NFL Football</option>
+          <option value="basketball/nba">NBA Basketball</option>
+          <option value="baseball/mlb">MLB Baseball</option>
+          <option value="hockey/nhl">NHL Hockey</option>
+          <option value="soccer/usa.1">MLS Soccer</option>
+          <option value="basketball/wnba">WNBA</option>
+        </select>
+        <button class="btn btn-primary" id="btn-fetch-sports">Fetch Latest</button>
+      </div>
+
+      <!-- Sports filters -->
+      <details class="filter-box">
+        <summary>Filters</summary>
+        <div class="filter-grid">
+          <label>Status
+            <select id="sf-status">
+              <option value="">All</option>
+              <option value="live">Live</option>
+              <option value="final">Final</option>
+              <option value="scheduled">Scheduled</option>
+            </select>
+          </label>
+          <label>Min total score
+            <input type="number" id="sf-min-score" placeholder="0" min="0" />
+          </label>
+          <label>Max total score
+            <input type="number" id="sf-max-score" placeholder="∞" min="0" />
+          </label>
+          <label>Close game margin ≤
+            <input type="number" id="sf-close-margin" placeholder="e.g. 7" min="0" />
+          </label>
+        </div>
+        <button class="btn btn-primary" id="btn-apply-sports-filter">Apply Filter</button>
+        <button class="btn"             id="btn-clear-sports-filter">Clear</button>
+      </details>
+
+      <!-- Quick views -->
+      <div class="agg-row">
+        <span>Quick:</span>
+        <button class="btn btn-sm" id="btn-high-scoring">High Scoring</button>
+        <button class="btn btn-sm" id="btn-close-games">Close Games</button>
+        <button class="btn btn-sm" onclick="loadSportsAggregate()">Summary</button>
+      </div>
+
+      <!-- Fetch status -->
+      <p id="sports-status" class="status-msg"></p>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <table id="sports-table">
+          <thead>
+            <tr>
+              <th>League</th>
+              <th>Home</th>
+              <th>Score</th>
+              <th>Away</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="sports-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Aggregate modal -->
+  <div id="agg-modal" class="modal hidden">
+    <div class="modal-inner">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h3 id="agg-title">Aggregate</h3>
+      <pre id="agg-content"></pre>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
