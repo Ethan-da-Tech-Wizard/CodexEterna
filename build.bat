@@ -44,6 +44,7 @@ REM ── Step 2: Build ──────────────────�
 echo.
 echo [2/3] Building portable executable...
 pyinstaller --onefile ^
+  --windowed ^
   --name CodexEterna ^
   --distpath dist ^
   --add-data "templates;templates" ^

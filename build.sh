@@ -42,6 +42,7 @@ echo ""
 echo "▶ Step 2/3  Building portable binary…"
 
 pyinstaller --onefile \
+  --windowed \
   --name CodexEterna \
   --distpath dist \
   --add-data "templates:templates" \
@@ -53,17 +54,32 @@ pyinstaller --onefile \
   app.py
 
 deactivate
-echo "   ✅ Build complete → dist/CodexEterna"
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  OUTPUT="dist/CodexEterna.app"
+else
+  OUTPUT="dist/CodexEterna"
+fi
+
+echo "   ✅ Build complete → $OUTPUT"
 
 # ── Step 3: Done ──────────────────────────────────────────────────────────────
 echo ""
-echo "╔══════════════════════════════════════════╗"
-echo "║   Done!                                  ║"
-echo "║                                          ║"
-echo "║   Your file:  dist/CodexEterna           ║"
-echo "║                                          ║"
-echo "║   Send that file to anyone.              ║"
-echo "║   They just double-click it — done.      ║"
-echo "╚══════════════════════════════════════════╝"
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║   Done!                                              ║"
+echo "║                                                      ║"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+echo "║   Your file:  dist/CodexEterna.app                   ║"
+echo "║                                                      ║"
+echo "║   Copy CodexEterna.app to your Desktop or            ║"
+echo "║   Applications folder — double-click to open.        ║"
+else
+echo "║   Your file:  dist/CodexEterna                       ║"
+echo "║                                                      ║"
+echo "║   Copy that file anywhere — double-click to open.    ║"
+fi
+echo "║                                                      ║"
+echo "║   Send to anyone. No installs needed on their end.   ║"
+echo "╚══════════════════════════════════════════════════════╝"
 echo ""
 ls -lh "$ROOT/dist/"
