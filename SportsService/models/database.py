@@ -7,14 +7,14 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
 
-# Database URL from environment variable or default to SQLite
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:secret@sportsdb:5432/sportsdata"
-)
+# Default to SQLite so the app works with zero external dependencies.
+# Override with DATABASE_URL env var to use PostgreSQL in production/Docker.
+_default_db = "sqlite:///./sportsdata.db"
+DATABASE_URL = os.getenv("DATABASE_URL", _default_db)
 
-# Create engine
-engine = create_engine(DATABASE_URL, echo=True)
+# SQLite needs check_same_thread=False; PostgreSQL ignores extra connect_args
+_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=_connect_args, echo=False)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

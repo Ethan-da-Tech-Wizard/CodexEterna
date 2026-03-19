@@ -4,23 +4,9 @@ A production-ready hybrid C# and Python microservices system demonstrating high-
 
 ---
 
-## 🚨 NEW USER? START HERE! 🚨
+## 👉 [HOW_TO_RUN.md](HOW_TO_RUN.md) — Start here
 
-**👉 [START_HERE.md](START_HERE.md) - Ultra-simple setup guide (5 minutes)**
-
-**Too long, didn't read:**
-```bash
-# 1. Install Docker Desktop from docker.com
-# 2. Download this project as ZIP or clone it
-# 3. Open terminal in the CodexEterna folder
-# 4. Run this:
-docker-compose up --build
-# 5. Open browser to: http://localhost:5000
-```
-
-**Other Guides:**
-- [QUICKSTART.md](QUICKSTART.md) - Fast setup for experienced users
-- [DEMO_GUIDE.md](DEMO_GUIDE.md) - Complete demo walkthrough
+Builds a real desktop installer (`.exe` / `.dmg`) **or** runs via Docker.
 
 ---
 
