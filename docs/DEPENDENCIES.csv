@@ -1,0 +1,11 @@
+ecosystem,name,requirement,version,scope,manifest,license,metadata_version,evidence,evidence_kind,resolution_note
+NuGet,Microsoft.AspNetCore.SignalR,1.1.0,,direct,PingService/PingService.csproj,Custom/URL terms — inspect linked license,1.1.0,https://raw.githubusercontent.com/aspnet/AspNetCore/2.0.0/LICENSE.txt,Pinned NuGet package licenseUrl,
+NuGet,Swashbuckle.AspNetCore,6.5.0,,direct,PingService/PingService.csproj,MIT,6.5.0,https://api.nuget.org/v3-flatcontainer/swashbuckle.aspnetcore/6.5.0/swashbuckle.aspnetcore.6.5.0.nupkg,,
+PyPI,fastapi,==0.104.1,0.104.1,direct,SportsService/requirements.txt,OSI Approved :: MIT License,0.104.1,https://pypi.org/pypi/fastapi/0.104.1/json,,
+PyPI,uvicorn,==0.24.0,0.24.0,direct,SportsService/requirements.txt,OSI Approved :: BSD License,0.24.0,https://pypi.org/pypi/uvicorn/0.24.0/json,,
+PyPI,sqlalchemy,==2.0.23,2.0.23,direct,SportsService/requirements.txt,MIT,2.0.23,https://pypi.org/pypi/sqlalchemy/2.0.23/json,,
+PyPI,psycopg2-binary,==2.9.9,2.9.9,direct,SportsService/requirements.txt,LGPL with exceptions,2.9.9,https://pypi.org/pypi/psycopg2-binary/2.9.9/json,,
+PyPI,requests,==2.31.0,2.31.0,direct,SportsService/requirements.txt,Apache 2.0,2.31.0,https://pypi.org/pypi/requests/2.31.0/json,,
+PyPI,pydantic,==2.5.0,2.5.0,direct,SportsService/requirements.txt,OSI Approved :: MIT License,2.5.0,https://pypi.org/pypi/pydantic/2.5.0/json,,
+PyPI,python-dotenv,==1.0.0,1.0.0,direct,SportsService/requirements.txt,BSD-3-Clause,1.0.0,https://pypi.org/pypi/python-dotenv/1.0.0/json,,
+PyPI,alembic,==1.12.1,1.12.1,direct,SportsService/requirements.txt,MIT,1.12.1,https://pypi.org/pypi/alembic/1.12.1/json,,
