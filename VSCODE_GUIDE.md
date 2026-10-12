@@ -92,7 +92,7 @@ The project includes extension recommendations. Install them by:
 2. Make sure you opened the folder containing `docker-compose.yml`
 3. Use `cd` to navigate to the root if needed:
    ```bash
-   cd C:\Users\eman7\OneDrive\Desktop\Dev_Bois\Project_1
+   cd path\to\CodexEterna
    ```
 
 #### ❌ Error: "Docker daemon is not running"
