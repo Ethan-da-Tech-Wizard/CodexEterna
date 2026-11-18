@@ -1,3 +1,10 @@
+# ==============================================================================
+# Program: init_db.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Standalone database initialization CLI script creating relational schema
+#          tables for games, teams, and tournament metadata.
+# ==============================================================================
 """
 Database initialization script
 Run this to create database tables
@@ -15,6 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# Step 1: Execute DDL table creation and report database connectivity status
 def main():
     """Initialize the database"""
     logger.info("=" * 60)

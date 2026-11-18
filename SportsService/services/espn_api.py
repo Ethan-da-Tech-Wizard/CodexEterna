@@ -1,3 +1,10 @@
+# ==============================================================================
+# Program: espn_api.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: HTTP client adapter fetching, transforming, and normalizing scoreboard
+#          payloads from public ESPN endpoint feeds across major sports leagues.
+# ==============================================================================
 """
 ESPN API Service - Fetches sports data from ESPN's unofficial API
 """
@@ -33,6 +40,7 @@ class ESPNAPIService:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         })
 
+    # Step 1: Query league scoreboard endpoint with robust HTTP error handling
     def fetch_scoreboard(self, league: str) -> List[Dict]:
         """
         Fetch scoreboard data for a specific league
@@ -65,6 +73,7 @@ class ESPNAPIService:
             logger.error(f"Error fetching scoreboard: {e}")
             raise
 
+    # Step 2: Parse raw JSON feed and extract standardized game records
     def _parse_scoreboard(self, data: Dict, league: str, sport: str) -> List[Dict]:
         """
         Parse ESPN scoreboard JSON response

@@ -1,9 +1,19 @@
+// ==============================================================================
+// Program: Program.cs
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Application bootstrap, dependency injection composition root, and HTTP
+//          middleware pipeline configuration for the CodexEterna real-time data
+//          streaming backend service.
+// ==============================================================================
 using PingService.Hubs;
 using PingService.Services;
 
+// Step 1: Initialize ASP.NET Core application builder and configuration
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
+// Step 2: Register REST controllers and configure high-throughput SignalR options
 builder.Services.AddControllers();
 builder.Services.AddSignalR(options =>
 {
@@ -12,6 +22,7 @@ builder.Services.AddSignalR(options =>
 });
 
 // Add PingGeneratorService as a singleton hosted service
+// Step 3: Register background singleton hosted services for streaming data collection
 builder.Services.AddSingleton<PingGeneratorService>();
 builder.Services.AddHostedService<PingGeneratorService>(provider =>
     provider.GetRequiredService<PingGeneratorService>());
@@ -45,6 +56,7 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Step 4: Construct the web application pipeline
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
@@ -65,6 +77,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+// Step 5: Map controller routes and SignalR WebSocket hub endpoints
 app.MapControllers();
 app.MapHub<PingHub>("/hubs/ping");
 

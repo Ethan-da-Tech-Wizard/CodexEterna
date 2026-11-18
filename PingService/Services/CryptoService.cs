@@ -1,3 +1,11 @@
+// ==============================================================================
+// Program: CryptoService.cs
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Long-running hosted background service establishing a persistent WebSocket
+//          stream to Binance market feeds, parsing BTC/USDT live trades, calculating
+//          rolling metrics, and periodically taking 10-minute snapshot records.
+// ==============================================================================
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
@@ -55,6 +63,7 @@ public class CryptoService : BackgroundService
         _recentTrades = new List<CryptoTrade>();
     }
 
+    // Step 1: Main background daemon lifecycle management loop
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("CryptoService initialized - awaiting manual start");
@@ -137,6 +146,7 @@ public class CryptoService : BackgroundService
         }
     }
 
+    // Step 4: Parse incoming JSON payload and update rolling price statistics
     private void ProcessTradeMessage(string message)
     {
         try
@@ -194,6 +204,7 @@ public class CryptoService : BackgroundService
         }
     }
 
+    // Step 5: Capture periodic 10-minute historical snapshot with timestamped record
     private void TakeSnapshot()
     {
         var now = DateTime.UtcNow;
@@ -259,6 +270,7 @@ public class CryptoService : BackgroundService
     /// <summary>
     /// Start crypto monitoring (requires manual confirmation)
     /// </summary>
+    // Step 2: Explicit manual start command ensuring operator control over network activity
     public void Start()
     {
         if (!_isRunning)

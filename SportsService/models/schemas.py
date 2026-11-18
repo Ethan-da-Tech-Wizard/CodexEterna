@@ -1,3 +1,10 @@
+# ==============================================================================
+# Program: schemas.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Pydantic schema validation models defining request/response contracts
+#          and serialization rules for sports API endpoints.
+# ==============================================================================
 """
 Pydantic schemas for API request/response validation
 """
@@ -6,6 +13,7 @@ from datetime import datetime
 from typing import Optional
 
 
+# Step 1: Shared attribute schema for game entity validation
 class GameBase(BaseModel):
     """Base game schema"""
     league: str
@@ -32,6 +40,7 @@ class GameUpdate(BaseModel):
     is_final: Optional[bool] = None
 
 
+# Step 2: Public API response schema including generated identifiers
 class GameResponse(GameBase):
     """Schema for game response"""
     id: int

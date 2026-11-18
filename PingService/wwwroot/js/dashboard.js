@@ -1,3 +1,12 @@
+// ==============================================================================
+// Program: dashboard.js
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Client-side orchestration and telemetry visualization controller for
+//          CodexEterna. Manages SignalR WebSocket connections, throttled DOM
+//          rendering for 20k/sec coordinate streams, Binance crypto pricing, and
+//          RESTful sports scoreboard fetching.
+// ==============================================================================
 // Real-Time Data Pipeline Dashboard JavaScript
 
 // Configuration
@@ -16,6 +25,7 @@ let pingGeneratorInterval = null;
 let currentSortMode = 'count-desc';
 
 // Initialize dashboard on page load
+// Step 1: Initialize dashboard components, UI bindings, and telemetry loops upon DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing Real-Time Data Pipeline Dashboard...');
 
@@ -38,6 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // SignalR Connection Management
 // ============================================================================
 
+// Step 2: Establish robust SignalR WebSocket connection with automatic retry
 async function initializeSignalR() {
     try {
         // Create SignalR connection
@@ -325,6 +336,7 @@ function displaySearchResults(results) {
 // Sports Data Functions
 // ============================================================================
 
+// Step 5: Query backend SportsService for live scores and schedule updates
 async function fetchSportsData() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;

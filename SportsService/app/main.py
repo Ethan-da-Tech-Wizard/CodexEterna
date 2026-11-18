@@ -1,3 +1,10 @@
+# ==============================================================================
+# Program: main.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: FastAPI application server providing RESTful endpoints for sports data
+#          aggregation from ESPN APIs, persistent SQLite storage, and query filtering.
+# ==============================================================================
 """
 Sports Data Service - FastAPI Application
 Fetches and stores sports data from ESPN API
@@ -42,6 +49,7 @@ app.add_middleware(
 )
 
 
+# Step 1: Initialize database schema and verify table availability on startup
 @app.on_event("startup")
 async def startup_event():
     """Initialize database on startup"""

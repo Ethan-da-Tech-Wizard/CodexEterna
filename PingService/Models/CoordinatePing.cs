@@ -1,8 +1,17 @@
+// ==============================================================================
+// Program: CoordinatePing.cs
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Data transfer objects (DTOs) and domain entity definitions representing
+//          geospatial coordinate frequencies, batch telemetry messages, and system
+//          throughput health metrics.
+// ==============================================================================
 namespace PingService.Models;
 
 /// <summary>
 /// Represents a geographic coordinate with its occurrence count
 /// </summary>
+// Step 1: Thread-safe data model tracking coordinate occurrences and timestamps
 public class CoordinatePing
 {
     public double Latitude { get; set; }
@@ -24,6 +33,7 @@ public class CoordinatePing
 /// <summary>
 /// Update message sent to clients via SignalR
 /// </summary>
+// Step 2: Lightweight wire DTO for low-overhead client transmission via SignalR
 public class PingUpdate
 {
     public double Latitude { get; set; }
@@ -43,6 +53,7 @@ public class PingUpdate
 /// <summary>
 /// Statistics about the ping generation system
 /// </summary>
+// Step 3: Aggregated system diagnostics and throughput metrics
 public class PingStats
 {
     public long TotalPingsGenerated { get; set; }
