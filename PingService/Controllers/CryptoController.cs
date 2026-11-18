@@ -1,3 +1,8 @@
+// Program: CodexEterna - CryptoController.cs
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: REST controller to start and stop crypto monitoring and to read its statistics and stored snapshots.
+// --- Imports ---
 using Microsoft.AspNetCore.Mvc;
 using PingService.Models;
 using PingService.Services;
@@ -9,8 +14,10 @@ namespace PingService.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+// --- Controller: routes begin with api/crypto (the controller name) ---
 public class CryptoController : ControllerBase
 {
+    // Dependencies are injected by ASP.NET and kept read-only.
     private readonly CryptoService _cryptoService;
     private readonly ILogger<CryptoController> _logger;
 
@@ -18,6 +25,7 @@ public class CryptoController : ControllerBase
         CryptoService cryptoService,
         ILogger<CryptoController> logger)
     {
+        // Store the injected services for use by the action methods.
         _cryptoService = cryptoService;
         _logger = logger;
     }
@@ -28,9 +36,11 @@ public class CryptoController : ControllerBase
     [HttpPost("start")]
     public IActionResult Start()
     {
+        // Refuse a second start so only one connection is open at a time.
         if (_cryptoService.IsRunning)
             return BadRequest(new { message = "Crypto monitoring is already running", status = "running" });
 
+        // Begin collecting; this does not wait for the work to finish.
         _cryptoService.Start();
         _logger.LogInformation("Crypto monitoring STARTED via API - Connecting to Binance WebSocket");
 
@@ -47,9 +57,11 @@ public class CryptoController : ControllerBase
     [HttpPost("stop")]
     public async Task<IActionResult> Stop()
     {
+        // Nothing to stop: report that as a client error.
         if (!_cryptoService.IsRunning)
             return BadRequest(new { message = "Crypto monitoring is not running", status = "stopped" });
 
+        // Wait until the service has fully shut down before answering.
         await _cryptoService.StopAsync();
         _logger.LogInformation("Crypto monitoring STOPPED via API - Disconnected from Binance");
 
@@ -65,6 +77,7 @@ public class CryptoController : ControllerBase
     [HttpGet("stats")]
     public ActionResult<CryptoStats> GetStats()
     {
+        // Return a live statistics object serialized as JSON.
         return Ok(_cryptoService.GetCurrentStats());
     }
 
@@ -85,6 +98,7 @@ public class CryptoController : ControllerBase
         [FromQuery] DateTime startDate,
         [FromQuery] DateTime endDate)
     {
+        // Reject reversed ranges before querying.
         if (startDate > endDate)
             return BadRequest(new { message = "Start date must be before end date" });
 
@@ -98,6 +112,7 @@ public class CryptoController : ControllerBase
     [HttpGet("health")]
     public IActionResult Health()
     {
+        // Reuse the statistics object to build a small health summary.
         var stats = _cryptoService.GetCurrentStats();
         return Ok(new
         {

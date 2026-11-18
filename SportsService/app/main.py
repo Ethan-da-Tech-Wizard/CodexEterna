@@ -1,7 +1,12 @@
+# Program: CodexEterna - main.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: FastAPI application exposing endpoints to fetch sports scores from ESPN, store them in the database and query them with filters and statistics.
 """
 Sports Data Service - FastAPI Application
 Fetches and stores sports data from ESPN API
 """
+# --- Imports ---
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -9,6 +14,7 @@ from typing import List, Optional
 from datetime import datetime
 import logging
 
+# Project modules (the service is run from its own folder, so these resolve as top-level packages).
 from models.database import get_db, init_db, engine
 from models.schemas import (
     GameResponse,
@@ -25,6 +31,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Application setup ---
 # Create FastAPI app
 app = FastAPI(
     title="Sports Data Service",
@@ -35,6 +42,7 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
+    # Wide-open CORS lets any web page call this API; tighten before exposing it publicly.
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -42,6 +50,7 @@ app.add_middleware(
 )
 
 
+# --- Startup and basic endpoints ---
 @app.on_event("startup")
 async def startup_event():
     """Initialize database on startup"""
@@ -53,6 +62,7 @@ async def startup_event():
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
+        # The service keeps running so /health can report the problem.
         # Don't crash the app, but log the error
 
 
@@ -72,11 +82,13 @@ async def root():
     }
 
 
+# Used by Docker and monitors to see whether the service and database are working.
 @app.get("/health", response_model=HealthResponse)
 async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint"""
     try:
         # Test database connection
+        # A cheap count query proves the database connection works.
         game_count = game_service.get_game_count(db)
 
         return HealthResponse(
@@ -86,9 +98,11 @@ async def health_check(db: Session = Depends(get_db)):
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
+        # 503 tells callers the service is temporarily unavailable.
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
 
 
+# --- Data collection endpoint ---
 @app.get("/api/sports/fetch", response_model=FetchResponse)
 async def fetch_sports_data(
     league: str = Query(..., description="League to fetch (e.g., 'football/nfl', 'basketball/nba')"),
@@ -108,6 +122,7 @@ async def fetch_sports_data(
         logger.info(f"Fetching data for league: {league}")
 
         # Fetch data from ESPN API
+        # Network call to ESPN; raises ValueError for an unsupported league.
         games_data = espn_api.fetch_scoreboard(league)
 
         if not games_data:
@@ -124,6 +139,7 @@ async def fetch_sports_data(
         games_updated = 0
 
         for game_data in games_data:
+            # Upsert each game and count whether it was inserted or refreshed.
             game, is_new = game_service.create_or_update_game(db, game_data)
 
             if is_new:
@@ -148,6 +164,7 @@ async def fetch_sports_data(
 
     except ValueError as e:
         logger.error(f"Invalid league: {e}")
+        # Client error: the league name was not recognised.
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
@@ -155,6 +172,7 @@ async def fetch_sports_data(
         raise HTTPException(status_code=500, detail=f"Failed to fetch data: {str(e)}")
 
 
+# --- Query endpoints ---
 @app.get("/api/sports/games", response_model=List[GameResponse])
 async def get_games(
     league: Optional[str] = Query(None, description="Filter by league"),
@@ -177,6 +195,7 @@ async def get_games(
         List of GameResponse objects
     """
     try:
+        # Filters are checked in priority order: team, then days, then league.
         if team:
             games = game_service.get_games_by_team(db, team, limit)
         elif days:
@@ -184,6 +203,7 @@ async def get_games(
         elif league:
             games = game_service.get_games_by_league(db, league, limit)
         else:
+            # With no filter given, return the last 7 days.
             # Get all recent games
             games = game_service.get_recent_games(db, 7, limit)
 
@@ -196,6 +216,7 @@ async def get_games(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve games: {str(e)}")
 
 
+# Single game lookup by its provider id.
 @app.get("/api/sports/game/{game_id}", response_model=GameResponse)
 async def get_game(
     game_id: str,
@@ -215,10 +236,12 @@ async def get_game(
         game = game_service.get_game_by_id(db, game_id)
 
         if not game:
+            # 404 when no stored game has this id.
             raise HTTPException(status_code=404, detail=f"Game not found: {game_id}")
 
         return game
 
+    # Let deliberate HTTP errors pass through instead of being turned into 500s.
     except HTTPException:
         raise
     except Exception as e:
@@ -251,6 +274,7 @@ async def get_filtered_games(
     Sort results by various fields in ascending or descending order.
     """
     try:
+        # Dates arrive as YYYY-MM-DD text and are converted to datetime objects.
         # Parse dates if provided
         date_from_obj = None
         date_to_obj = None
@@ -295,6 +319,7 @@ async def get_filtered_games(
         raise HTTPException(status_code=500, detail=f"Failed to filter games: {str(e)}")
 
 
+# --- Ranked and grouped queries ---
 @app.get("/api/sports/high-scoring", response_model=List[GameResponse])
 async def get_high_scoring_games(
     threshold: int = Query(100, ge=50, le=300, description="Minimum total score"),
@@ -360,6 +385,7 @@ async def get_games_by_status(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve games by status: {str(e)}")
 
 
+# Counts of games grouped by league, status, final flag or date.
 @app.get("/api/sports/aggregate")
 async def get_aggregate_statistics(
     group_by: str = Query("league", description="Group by: league, status, final, date"),
@@ -374,6 +400,7 @@ async def get_aggregate_statistics(
     - date: Count of games per date (last 7 days)
     """
     try:
+        # Whitelist of grouping options the service layer understands.
         valid_groupings = ["league", "status", "final", "date"]
         if group_by not in valid_groupings:
             raise HTTPException(
@@ -394,6 +421,7 @@ async def get_aggregate_statistics(
         raise HTTPException(status_code=500, detail=f"Failed to get aggregate stats: {str(e)}")
 
 
+# --- Info and maintenance endpoints ---
 @app.get("/api/sports/leagues")
 async def get_supported_leagues():
     """
@@ -415,6 +443,7 @@ async def get_supported_leagues():
     }
 
 
+# Removes stored games older than the given number of days.
 @app.delete("/api/sports/cleanup")
 async def cleanup_old_games(
     days: int = Query(30, ge=1, le=365, description="Delete games older than N days"),
@@ -458,6 +487,7 @@ async def get_stats(db: Session = Depends(get_db)):
         Statistics dictionary
     """
     try:
+        # Overall total, then a per-league breakdown below (leagues with no games are omitted).
         total_games = game_service.get_game_count(db)
 
         # Get counts by league
@@ -480,6 +510,7 @@ async def get_stats(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
+# --- Local development runner ---
 if __name__ == "__main__":
     import uvicorn
 
@@ -487,6 +518,7 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=5001,
+        # Auto-restart on code changes (development only).
         reload=True,
         log_level="info"
     )

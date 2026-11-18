@@ -1,14 +1,23 @@
 <!DOCTYPE html>
+<!--
+  Program: CodexEterna - index.html
+  Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+  Last Modified: 2026-11-18
+  Purpose: Single-page dashboard markup with theme settings and tabs for the coordinate ping stream, crypto monitoring and sports data; behavior comes from the linked script.
+-->
 <html lang="en">
 <head>
+    <!-- Page head: character set, mobile-friendly scaling, title, stylesheet and web fonts. -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CodexEterna - Real-Time Data Pipeline</title>
     <link rel="stylesheet" href="/css/dashboard.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- The font links in this head section point to an external font host, so those fonts need internet access. -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
+<!-- Buttons below use inline onclick handlers that call functions defined in the dashboard script linked at the bottom of this file. -->
 <body>
     <!-- Settings Button (Floating) -->
     <button class="settings-btn" id="settingsBtn" onclick="toggleSettings()" title="Customize Background">
@@ -117,6 +126,7 @@
         </header>
 
         <!-- Tab Navigation -->
+        <!-- Clicking a tab calls switchTab with the name of the panel to show. -->
         <div class="tab-navigation">
             <button class="tab-btn active" onclick="switchTab('ping')" id="pingTab">
                 Coordinate Ping Stream
@@ -346,6 +356,7 @@
     </div>
 
     <!-- SignalR Client Library (CDN) -->
+    <!-- Scripts are loaded in order: the SignalR library first, because the dashboard script depends on it. -->
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@7.0.0/dist/browser/signalr.min.js"></script>
 
     <!-- Dashboard JavaScript -->

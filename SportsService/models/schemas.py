@@ -1,11 +1,17 @@
+# Program: CodexEterna - schemas.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Pydantic models that validate and describe the request and response bodies of the Sports Data Service API.
 """
 Pydantic schemas for API request/response validation
 """
+# --- Imports ---
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
 
+# --- Game schemas ---
 class GameBase(BaseModel):
     """Base game schema"""
     league: str
@@ -40,10 +46,12 @@ class GameResponse(GameBase):
     created_at: datetime
     updated_at: datetime
 
+    # Allow building the schema directly from a database object's attributes.
     class Config:
         from_attributes = True
 
 
+# --- Team schemas ---
 class TeamBase(BaseModel):
     """Base team schema"""
     name: str
@@ -70,6 +78,7 @@ class TeamResponse(TeamBase):
         from_attributes = True
 
 
+# --- Operational response schemas ---
 class FetchResponse(BaseModel):
     """Response for fetch operations"""
     success: bool

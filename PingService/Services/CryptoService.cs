@@ -1,3 +1,8 @@
+// Program: CodexEterna - CryptoService.cs
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Background service that streams live BTC/USDT trades from Binance over a WebSocket, tracks price and range, takes 10-minute snapshots and broadcasts updates to browsers.
+// --- Imports ---
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
@@ -15,6 +20,7 @@ namespace PingService.Services;
 /// </summary>
 public class CryptoService : BackgroundService
 {
+    // Injected dependencies: the hub context lets this background service push messages to browsers.
     private readonly IHubContext<PingHub> _hubContext;
     private readonly ILogger<CryptoService> _logger;
 
@@ -23,27 +29,36 @@ public class CryptoService : BackgroundService
     private readonly Uri _binanceWebSocketUri = new Uri("wss://stream.binance.com:9443/ws/btcusdt@trade");
 
     // Control flags
+    // volatile because the flag is changed by HTTP requests and read by the background loop on other threads.
     private volatile bool _isRunning = false;
+    // Measures uptime while monitoring is active.
     private readonly Stopwatch _stopwatch;
     private DateTime _startTime;
     private DateTime _lastSnapshotTime;
 
     // Crypto data storage
+    // Thread-safe store of snapshots, keyed by their timestamp text.
     private readonly ConcurrentDictionary<string, CryptoSnapshot> _cryptoSnapshots;
+    // Small rolling buffer of the latest trades; guarded by the lock below.
     private readonly List<CryptoTrade> _recentTrades;
     private readonly object _tradesLock = new object();
 
     // Configuration
+    // Settings: snapshot spacing, trade buffer size, and pause before reconnecting.
     private const int SNAPSHOT_INTERVAL_MINUTES = 10;
     private const int MAX_TRADES_BUFFER = 1000;
     private const int RECONNECT_DELAY_MS = 5000;
 
     // Current price tracking
+    // Running values for the current interval; the low starts at the maximum so any real price replaces it.
     private decimal _currentPrice = 0;
     private decimal _highPrice = 0;
     private decimal _lowPrice = decimal.MaxValue;
     private long _totalTrades = 0;
 
+    /// <summary>
+    /// Creates the service with its injected dependencies and empty storage.
+    /// </summary>
     public CryptoService(
         IHubContext<PingHub> hubContext,
         ILogger<CryptoService> logger)
@@ -55,6 +70,9 @@ public class CryptoService : BackgroundService
         _recentTrades = new List<CryptoTrade>();
     }
 
+    /// <summary>
+    /// Main background loop: idles until Start() is called, then runs the monitor.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("CryptoService initialized - awaiting manual start");
@@ -67,30 +85,38 @@ public class CryptoService : BackgroundService
             }
             else
             {
+                // Data collection only begins when a user asks for it.
                 // Wait for manual start
                 await Task.Delay(1000, stoppingToken);
             }
         }
     }
 
+    /// <summary>
+    /// Connects to Binance, reads trade messages until stopped or disconnected, then cleans up and reconnects if still running.
+    /// </summary>
     private async Task RunCryptoMonitoring(CancellationToken stoppingToken)
     {
         try
         {
             _logger.LogInformation("Connecting to Binance WebSocket...");
 
+            // Open a new connection for each monitoring session.
             _webSocket = new ClientWebSocket();
             await _webSocket.ConnectAsync(_binanceWebSocketUri, stoppingToken);
 
             _logger.LogInformation("Connected to Binance WebSocket - Monitoring BTC/USDT");
 
             // Start snapshot timer
+            // Runs alongside the receive loop below; awaited at the end.
             var snapshotTask = TakePeriodicSnapshots(stoppingToken);
 
             // Process incoming messages
+            // Reusable receive buffer; messages here are small text frames.
             var buffer = new byte[8192];
             while (_webSocket.State == WebSocketState.Open && _isRunning && !stoppingToken.IsCancellationRequested)
             {
+                // Waits for the next message from the server.
                 var result = await _webSocket.ReceiveAsync(
                     new ArraySegment<byte>(buffer),
                     stoppingToken);
@@ -107,12 +133,14 @@ public class CryptoService : BackgroundService
                 }
             }
 
+            // Make sure the snapshot loop has finished before cleaning up.
             await snapshotTask;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in crypto monitoring");
         }
+        // Always release the socket, whatever happened above.
         finally
         {
             if (_webSocket != null)
@@ -137,6 +165,9 @@ public class CryptoService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Parses one trade message, updates price statistics and the recent-trade buffer, and pushes the new price to browsers.
+    /// </summary>
     private void ProcessTradeMessage(string message)
     {
         try
@@ -144,6 +175,7 @@ public class CryptoService : BackgroundService
             var trade = JsonSerializer.Deserialize<BinanceTradeMessage>(message);
             if (trade != null)
             {
+                // The exchange sends prices as text; decimal keeps exact values.
                 _currentPrice = decimal.Parse(trade.p);
                 _totalTrades++;
 
@@ -172,6 +204,7 @@ public class CryptoService : BackgroundService
                 }
 
                 // Broadcast current price to clients
+                // Blocks until the send completes so messages go out in order.
                 BroadcastCurrentPriceAsync(_currentPrice).Wait();
             }
         }
@@ -181,6 +214,9 @@ public class CryptoService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Waits one interval at a time and records a snapshot while monitoring is running.
+    /// </summary>
     private async Task TakePeriodicSnapshots(CancellationToken stoppingToken)
     {
         while (_isRunning && !stoppingToken.IsCancellationRequested)
@@ -194,6 +230,9 @@ public class CryptoService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Saves the current price, high, low and trade count as a snapshot, then resets the interval statistics.
+    /// </summary>
     private void TakeSnapshot()
     {
         var now = DateTime.UtcNow;
@@ -217,6 +256,7 @@ public class CryptoService : BackgroundService
             "Snapshot taken - Price: ${Price}, High: ${High}, Low: ${Low}, Trades: {Trades}",
             _currentPrice, _highPrice, _lowPrice, _totalTrades);
 
+        // Each snapshot starts a fresh interval from the latest price.
         // Reset interval stats
         _highPrice = _currentPrice;
         _lowPrice = _currentPrice;
@@ -227,6 +267,9 @@ public class CryptoService : BackgroundService
         BroadcastSnapshotAsync(snapshot).Wait();
     }
 
+    /// <summary>
+    /// Sends the latest price to every connected browser; failures are logged, not thrown.
+    /// </summary>
     private async Task BroadcastCurrentPriceAsync(decimal price)
     {
         try
@@ -244,6 +287,9 @@ public class CryptoService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Sends a newly taken snapshot to every connected browser; failures are logged, not thrown.
+    /// </summary>
     private async Task BroadcastSnapshotAsync(CryptoSnapshot snapshot)
     {
         try
@@ -263,6 +309,7 @@ public class CryptoService : BackgroundService
     {
         if (!_isRunning)
         {
+            // Flipping the flag wakes the background loop within a second.
             _isRunning = true;
             _startTime = DateTime.UtcNow;
             _lastSnapshotTime = DateTime.UtcNow;
@@ -276,6 +323,7 @@ public class CryptoService : BackgroundService
     /// </summary>
     public async Task StopAsync()
     {
+        // Clearing the flag makes the receive loop exit; the socket is then closed politely.
         _isRunning = false;
         _stopwatch.Stop();
         _logger.LogInformation("Crypto monitoring STOPPED - Disconnecting from Binance");
@@ -294,6 +342,7 @@ public class CryptoService : BackgroundService
     /// </summary>
     public IEnumerable<CryptoSnapshot> GetAllSnapshots()
     {
+        // Newest snapshots first.
         return _cryptoSnapshots.Values.OrderByDescending(s => s.Timestamp);
     }
 
@@ -325,6 +374,7 @@ public class CryptoService : BackgroundService
         };
     }
 
+    // Read-only view of the running flag for controllers.
     public bool IsRunning => _isRunning;
 }
 
@@ -333,6 +383,7 @@ public class CryptoService : BackgroundService
 /// </summary>
 public class BinanceTradeMessage
 {
+    // Property names are single letters because they must match the field names in the exchange's JSON.
     public string e { get; set; } = string.Empty; // Event type
     public long E { get; set; } // Event time
     public string s { get; set; } = string.Empty; // Symbol

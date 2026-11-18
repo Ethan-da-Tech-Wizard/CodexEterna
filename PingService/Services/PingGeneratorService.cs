@@ -1,3 +1,8 @@
+// Program: CodexEterna - PingGeneratorService.cs
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Background service that generates random latitude/longitude pings at a target rate, counts repeats per coordinate, answers queries about them and broadcasts batched updates and statistics to browsers.
+// --- Imports ---
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.AspNetCore.SignalR;
@@ -12,6 +17,8 @@ namespace PingService.Services;
 /// </summary>
 public class PingGeneratorService : BackgroundService
 {
+    // --- Fields: injected dependencies, storage, control flags and settings ---
+    // The hub context lets this background service push messages to browsers.
     private readonly IHubContext<PingHub> _hubContext;
     private readonly ILogger<PingGeneratorService> _logger;
 
@@ -21,11 +28,13 @@ public class PingGeneratorService : BackgroundService
     // Control flags
     private volatile bool _isPaused = true; // Start paused - require manual start
     private volatile bool _isRunning = false; // Track if system has been started
+    // Total is updated with Interlocked so it stays correct across threads.
     private long _totalPingsGenerated = 0;
     private DateTime _startTime;
     private readonly Stopwatch _stopwatch;
 
     // Configuration
+    // Tuning values for the generation rate and broadcast timing.
     private const int TARGET_PINGS_PER_SECOND = 20000;
     private const int BATCH_SIZE = 100; // Process in batches for efficiency
     private const int BROADCAST_INTERVAL_MS = 100; // Broadcast updates every 100ms
@@ -36,10 +45,14 @@ public class PingGeneratorService : BackgroundService
     private readonly SemaphoreSlim _updateSemaphore;
 
     // Random number generation (thread-safe via ThreadStatic)
+    // Each thread gets its own Random instance, avoiding locking and duplicate sequences.
     [ThreadStatic]
     private static Random? _random;
     private static Random RandomInstance => _random ??= new Random();
 
+    /// <summary>
+    /// Creates the service with its injected dependencies and empty storage.
+    /// </summary>
     public PingGeneratorService(
         IHubContext<PingHub> hubContext,
         ILogger<PingGeneratorService> logger)
@@ -52,6 +65,9 @@ public class PingGeneratorService : BackgroundService
         _stopwatch = new Stopwatch();
     }
 
+    /// <summary>
+    /// Runs when the host starts: launches the generator, update broadcaster and stats broadcaster and waits for all three.
+    /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _startTime = DateTime.UtcNow;
@@ -59,6 +75,7 @@ public class PingGeneratorService : BackgroundService
 
         _logger.LogInformation("PingGeneratorService starting...");
 
+        // The three loops run concurrently; the generator idles while paused.
         // Start multiple background tasks
         var generatorTask = GeneratePingsAsync(stoppingToken);
         var broadcasterTask = BroadcastUpdatesAsync(stoppingToken);
@@ -74,12 +91,14 @@ public class PingGeneratorService : BackgroundService
     {
         _logger.LogInformation("Starting ping generation at {Rate} pings/second", TARGET_PINGS_PER_SECOND);
 
+        // Time to wait after each batch so the overall rate matches the target.
         // Calculate delay between batches
         var delayMicroseconds = (BATCH_SIZE * 1_000_000) / TARGET_PINGS_PER_SECOND;
         var delayMilliseconds = delayMicroseconds / 1000.0;
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            // While paused, no pings are produced.
             if (!_isPaused)
             {
                 // Generate batch of coordinates
@@ -88,6 +107,7 @@ public class PingGeneratorService : BackgroundService
                     GenerateSinglePing();
                 }
 
+                // Task.Delay is coarse, so the real rate may differ somewhat from the target.
                 // Small delay to maintain target rate
                 if (delayMilliseconds > 0)
                 {
@@ -112,8 +132,10 @@ public class PingGeneratorService : BackgroundService
         double latitude = Math.Round((RandomInstance.NextDouble() * 180) - 90, 6);
         double longitude = Math.Round((RandomInstance.NextDouble() * 360) - 180, 6);
 
+        // Text key identifying this exact coordinate.
         string coordKey = $"{latitude},{longitude}";
 
+        // Atomic insert-or-increment so concurrent threads cannot lose counts.
         // Update or add coordinate count (thread-safe)
         var ping = _coordinateCounts.AddOrUpdate(
             coordKey,
@@ -126,6 +148,7 @@ public class PingGeneratorService : BackgroundService
             }
         );
 
+        // Atomic increment of the shared total.
         // Increment total counter
         Interlocked.Increment(ref _totalPingsGenerated);
 
@@ -138,10 +161,12 @@ public class PingGeneratorService : BackgroundService
     /// </summary>
     private async Task BroadcastUpdatesAsync(CancellationToken stoppingToken)
     {
+        // Reusable list, sized for the maximum batch.
         var updates = new List<PingUpdate>(1000);
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            // Wait between batches so many pings are sent in a single message.
             await Task.Delay(BROADCAST_INTERVAL_MS, stoppingToken);
 
             if (_updateQueue.IsEmpty)
@@ -149,6 +174,7 @@ public class PingGeneratorService : BackgroundService
 
             // Dequeue updates
             updates.Clear();
+            // Take up to 1000 queued updates per batch.
             while (_updateQueue.TryDequeue(out var update) && updates.Count < 1000)
             {
                 updates.Add(update);
@@ -164,6 +190,7 @@ public class PingGeneratorService : BackgroundService
                         updates,
                         stoppingToken);
                 }
+                // A failed send is logged and the loop continues.
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error broadcasting ping updates");
@@ -179,6 +206,7 @@ public class PingGeneratorService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            // Statistics go out once per interval.
             await Task.Delay(STATS_INTERVAL_MS, stoppingToken);
 
             try
@@ -198,6 +226,7 @@ public class PingGeneratorService : BackgroundService
     /// </summary>
     public PingStats GetCurrentStats()
     {
+        // Average rate since the stopwatch started; guarded against dividing by zero below.
         var elapsedSeconds = _stopwatch.Elapsed.TotalSeconds;
         var pingsPerSecond = elapsedSeconds > 0 ? _totalPingsGenerated / elapsedSeconds : 0;
 
@@ -209,6 +238,7 @@ public class PingGeneratorService : BackgroundService
             IsPaused = _isPaused,
             StartTime = _startTime,
             Uptime = _stopwatch.Elapsed,
+            // Managed heap size without forcing a collection, converted to megabytes.
             MemoryUsageMB = GC.GetTotalMemory(false) / (1024 * 1024)
         };
     }
@@ -219,6 +249,7 @@ public class PingGeneratorService : BackgroundService
     public IEnumerable<CoordinatePing> GetTopCoordinates(int count = 100)
     {
         return _coordinateCounts.Values
+            // Most frequently seen coordinates first.
             .OrderByDescending(c => c.Count)
             .Take(count);
     }
@@ -228,6 +259,7 @@ public class PingGeneratorService : BackgroundService
     /// </summary>
     public CoordinatePing? GetCoordinate(double latitude, double longitude)
     {
+        // Build the same key format used when storing coordinates.
         string key = $"{latitude},{longitude}";
         _coordinateCounts.TryGetValue(key, out var ping);
         return ping;
@@ -239,6 +271,7 @@ public class PingGeneratorService : BackgroundService
     public IEnumerable<CoordinatePing> SearchCoordinates(string pattern, int limit = 100)
     {
         return _coordinateCounts.Values
+            // Plain text match against the coordinate key.
             .Where(c => c.CoordinateKey.Contains(pattern, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(c => c.Count)
             .Take(limit);
@@ -260,8 +293,10 @@ public class PingGeneratorService : BackgroundService
         bool ascending = false,
         int limit = 100)
     {
+        // Filters are chained lazily; nothing runs until the results are read.
         var query = _coordinateCounts.Values.AsEnumerable();
 
+        // Each optional filter is applied only when a value was supplied.
         // Filter by latitude range
         if (minLat.HasValue)
             query = query.Where(c => c.Latitude >= minLat.Value);
@@ -290,6 +325,7 @@ public class PingGeneratorService : BackgroundService
         // Filter by hemisphere
         if (!string.IsNullOrEmpty(hemisphere))
         {
+            // Latitude 0 and above counts as north, longitude 0 and above as east.
             switch (hemisphere.ToLower())
             {
                 case "north":
@@ -319,6 +355,7 @@ public class PingGeneratorService : BackgroundService
             }
         }
 
+        // Choose the sort field and direction; unknown names fall back to sorting by count.
         // Sort
         query = sortBy.ToLower() switch
         {
@@ -336,6 +373,7 @@ public class PingGeneratorService : BackgroundService
     /// </summary>
     public IEnumerable<CoordinatePing> GetCoordinatesByRegion(string region, int limit = 100)
     {
+        // Rough bounding boxes (min/max latitude and longitude) per region; overlaps and gaps are possible. Unknown names cover the whole globe.
         var regionBounds = region.ToLower() switch
         {
             "north_america" => (minLat: 15.0, maxLat: 72.0, minLon: -170.0, maxLon: -50.0),
@@ -347,6 +385,7 @@ public class PingGeneratorService : BackgroundService
             _ => (minLat: -90.0, maxLat: 90.0, minLon: -180.0, maxLon: 180.0)
         };
 
+        // Reuse the general filter with the region's bounds.
         return GetFilteredCoordinates(
             minLat: regionBounds.minLat,
             maxLat: regionBounds.maxLat,
@@ -361,10 +400,12 @@ public class PingGeneratorService : BackgroundService
     /// </summary>
     public Dictionary<string, object> GetAggregateStats(string groupBy = "hemisphere")
     {
+        // Result maps each group label to a count of coordinates.
         var stats = new Dictionary<string, object>();
 
         if (groupBy.ToLower() == "hemisphere")
         {
+            // Counts unique coordinates, not pings.
             stats["North"] = _coordinateCounts.Values.Count(c => c.Latitude >= 0);
             stats["South"] = _coordinateCounts.Values.Count(c => c.Latitude < 0);
             stats["East"] = _coordinateCounts.Values.Count(c => c.Longitude >= 0);
@@ -379,6 +420,7 @@ public class PingGeneratorService : BackgroundService
         }
         else if (groupBy.ToLower() == "count_range")
         {
+            // Buckets by how many times a coordinate was seen.
             stats["1"] = _coordinateCounts.Values.Count(c => c.Count == 1);
             stats["2-5"] = _coordinateCounts.Values.Count(c => c.Count >= 2 && c.Count <= 5);
             stats["6-10"] = _coordinateCounts.Values.Count(c => c.Count >= 6 && c.Count <= 10);
@@ -396,6 +438,7 @@ public class PingGeneratorService : BackgroundService
     {
         if (!_isRunning)
         {
+            // First start switches the system on; a later call just resumes.
             _isRunning = true;
             _isPaused = false;
             _startTime = DateTime.UtcNow;
@@ -413,6 +456,7 @@ public class PingGeneratorService : BackgroundService
     /// </summary>
     public void Stop()
     {
+        // Stop also pauses so the generator loop goes idle.
         _isPaused = true;
         _isRunning = false;
         _stopwatch.Stop();
@@ -448,6 +492,7 @@ public class PingGeneratorService : BackgroundService
     /// </summary>
     public void Reset()
     {
+        // Throw away all stored coordinates and restart the clock.
         _coordinateCounts.Clear();
         _totalPingsGenerated = 0;
         _startTime = DateTime.UtcNow;
@@ -463,6 +508,7 @@ public class PingGeneratorService : BackgroundService
         return _coordinateCounts.Values;
     }
 
+    // Read-only status flags for controllers.
     public bool IsPaused => _isPaused;
     public bool IsRunning => _isRunning;
 }

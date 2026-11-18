@@ -1,3 +1,9 @@
+/*
+ * Program: CodexEterna - dashboard.css
+ * Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+ * Last Modified: 2026-11-18
+ * Purpose: Stylesheet for the dashboard page: theme variables, layout, settings panel, tabs, stat cards, controls, tables, scrollbars and responsive rules.
+ */
 /* ============================================================================
    CodexEterna - Professional Data Pipeline Dashboard
    Real-Time Monitoring & Analytics Platform
@@ -7,6 +13,7 @@
    CSS Variables & Professional Theme Configuration
    ============================================================================ */
 
+/* The variables below hold the theme colors, fonts and effect settings; the settings panel changes them at runtime, and every rule below reads them with var(). */
 :root {
     /* Executive Dark Theme (Default) */
     --bg-color-1: #1a1d29;
@@ -55,6 +62,7 @@
    Base Styles
    ============================================================================ */
 
+/* Reset default spacing on every element; border-box makes width include padding and border. */
 * {
     margin: 0;
     padding: 0;
@@ -65,6 +73,7 @@ html {
     scroll-behavior: smooth;
 }
 
+/* Page background is a gradient whose angle and colors come from the theme variables; fixed attachment keeps it still while scrolling. */
 body {
     font-family: var(--font-primary);
     background: linear-gradient(
@@ -84,6 +93,7 @@ body {
    Floating Settings Button
    ============================================================================ */
 
+/* Round button pinned to the screen that opens the settings panel. */
 .settings-btn {
     position: fixed;
     top: 20px;
@@ -117,6 +127,7 @@ body {
    Settings Panel
    ============================================================================ */
 
+/* Slide-in panel; translucent with a blur behind it. */
 .settings-panel {
     position: fixed;
     top: 0;
@@ -424,6 +435,7 @@ body {
     position: relative;
 }
 
+/* Panels are hidden by default; the one marked active is shown and fades in. */
 .tab-panel {
     display: none;
     animation: fadeIn 0.3s ease-in-out;
@@ -433,6 +445,7 @@ body {
     display: block;
 }
 
+/* Animation used when a panel appears. */
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -503,6 +516,7 @@ body {
     animation: none;
 }
 
+/* Gentle pulsing used by the live status indicator. */
 @keyframes pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.6; transform: scale(1.1); }
@@ -512,6 +526,7 @@ body {
    Stats Grid
    ============================================================================ */
 
+/* Responsive grid of summary cards. */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -556,6 +571,7 @@ body {
     animation: highlight 0.5s ease-in-out;
 }
 
+/* Brief flash used to draw attention to a value that just changed. */
 @keyframes highlight {
     0%, 100% { color: var(--text-primary); }
     50% { color: var(--primary-color); transform: scale(1.05); }
@@ -572,6 +588,7 @@ body {
     flex-wrap: wrap;
 }
 
+/* Shared base style for all buttons; modifier classes add colors. */
 .btn {
     padding: 12px 20px;
     border: 1px solid transparent;
@@ -730,6 +747,7 @@ body {
     border: 1px solid var(--border-color);
 }
 
+/* Table styling for coordinate, snapshot and game lists. */
 .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -940,6 +958,7 @@ body {
     animation: spin 0.8s linear infinite;
 }
 
+/* Rotation used by the loading spinner. */
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
@@ -948,6 +967,7 @@ body {
    Responsive Design
    ============================================================================ */
 
+/* Tablet and phone adjustments: tighter spacing and stacked layouts. */
 @media (max-width: 768px) {
     .settings-panel {
         width: 100%;
