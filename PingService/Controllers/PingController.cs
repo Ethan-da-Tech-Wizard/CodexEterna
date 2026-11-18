@@ -1,3 +1,8 @@
+// Program: CodexEterna - PingController.cs
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: REST controller to start, stop, pause and reset ping generation and to query the stored coordinate data.
+// --- Imports ---
 using Microsoft.AspNetCore.Mvc;
 using PingService.Models;
 using PingService.Services;
@@ -9,8 +14,10 @@ namespace PingService.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+// --- Controller: routes begin with api/ping (the controller name) ---
 public class PingController : ControllerBase
 {
+    // Dependencies are injected by ASP.NET and kept read-only.
     private readonly PingGeneratorService _pingService;
     private readonly ILogger<PingController> _logger;
 
@@ -18,6 +25,7 @@ public class PingController : ControllerBase
         PingGeneratorService pingService,
         ILogger<PingController> logger)
     {
+        // Store the injected services for use by the action methods.
         _pingService = pingService;
         _logger = logger;
     }
@@ -28,6 +36,7 @@ public class PingController : ControllerBase
     [HttpGet("stats")]
     public ActionResult<PingStats> GetStats()
     {
+        // --- Read-only queries ---
         return Ok(_pingService.GetCurrentStats());
     }
 
@@ -37,6 +46,7 @@ public class PingController : ControllerBase
     [HttpGet("top")]
     public ActionResult<IEnumerable<CoordinatePing>> GetTopCoordinates([FromQuery] int count = 100)
     {
+        // Cap result sizes so one request cannot return an unbounded amount of data.
         if (count < 1 || count > 10000)
             return BadRequest("Count must be between 1 and 10000");
 
@@ -51,6 +61,7 @@ public class PingController : ControllerBase
         [FromQuery] string pattern,
         [FromQuery] int limit = 100)
     {
+        // A search needs some text to match against.
         if (string.IsNullOrWhiteSpace(pattern))
             return BadRequest("Pattern is required");
 
@@ -68,6 +79,7 @@ public class PingController : ControllerBase
         [FromQuery] double lat,
         [FromQuery] double lon)
     {
+        // Exact lookup; null means that coordinate was never seen.
         var ping = _pingService.GetCoordinate(lat, lon);
 
         if (ping == null)
@@ -114,6 +126,7 @@ public class PingController : ControllerBase
         if (limit < 1 || limit > 10000)
             return BadRequest("Limit must be between 1 and 10000");
 
+        // Whitelist of region names the service understands.
         var validRegions = new[] { "north_america", "south_america", "europe", "africa", "asia", "oceania" };
         if (!validRegions.Contains(regionName.ToLower()))
             return BadRequest($"Invalid region. Valid regions: {string.Join(", ", validRegions)}");
@@ -129,6 +142,7 @@ public class PingController : ControllerBase
     public ActionResult<Dictionary<string, object>> GetAggregateStats(
         [FromQuery] string groupBy = "hemisphere")
     {
+        // Whitelist of grouping options.
         var validGroupings = new[] { "hemisphere", "quadrant", "count_range" };
         if (!validGroupings.Contains(groupBy.ToLower()))
             return BadRequest($"Invalid groupBy. Valid options: {string.Join(", ", validGroupings)}");
@@ -148,6 +162,8 @@ public class PingController : ControllerBase
     [HttpPost("start")]
     public IActionResult Start()
     {
+        // --- Control actions (start, stop, pause, resume, reset) ---
+        // Guard against starting twice.
         if (_pingService.IsRunning)
             return BadRequest(new { message = "Ping generation is already running", status = "running" });
 
@@ -167,6 +183,7 @@ public class PingController : ControllerBase
     [HttpPost("stop")]
     public IActionResult Stop()
     {
+        // Stopping when nothing is running is reported as a client error.
         if (!_pingService.IsRunning)
             return BadRequest(new { message = "Ping generation is not running", status = "stopped" });
 
@@ -188,6 +205,7 @@ public class PingController : ControllerBase
         if (!_pingService.IsRunning)
             return BadRequest(new { message = "Cannot pause - system is not running" });
 
+        // Pausing twice is reported as a client error.
         if (_pingService.IsPaused)
             return BadRequest(new { message = "Already paused" });
 
@@ -218,6 +236,7 @@ public class PingController : ControllerBase
     [HttpPost("toggle")]
     public IActionResult Toggle()
     {
+        // Toggle: resume if currently paused, otherwise pause.
         if (_pingService.IsPaused)
         {
             _pingService.Resume();
@@ -236,6 +255,7 @@ public class PingController : ControllerBase
     [HttpPost("reset")]
     public IActionResult Reset()
     {
+        // Clears all counters and stored coordinates.
         _pingService.Reset();
         _logger.LogInformation("Ping generation reset via API");
 
@@ -251,6 +271,7 @@ public class PingController : ControllerBase
         if (limit < 1 || limit > 1000000)
             return BadRequest("Limit must be between 1 and 1,000,000");
 
+        // Take() limits how many entries are returned.
         var results = _pingService.GetAllCoordinates().Take(limit);
         return Ok(results);
     }
@@ -261,6 +282,7 @@ public class PingController : ControllerBase
     [HttpGet("health")]
     public IActionResult Health()
     {
+        // Reuse the statistics object to build a small health summary.
         var stats = _pingService.GetCurrentStats();
         return Ok(new
         {

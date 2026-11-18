@@ -1,6 +1,11 @@
+# Program: CodexEterna - game_service.py
+# Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+# Last Modified: 2026-11-18
+# Purpose: Database operations for games: upserting from fetched data, lookups, filtered and ranked queries, cleanup and aggregate counts.
 """
 Game Service - Database operations for games
 """
+# --- Imports ---
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -9,10 +14,12 @@ import logging
 from models.database import Game, Team
 from models.schemas import GameCreate, GameUpdate
 
+# --- Logging setup ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# --- Game service: every method is static and takes the database session as its first argument ---
 class GameService:
     """
     Service for managing games in the database
@@ -30,19 +37,24 @@ class GameService:
         Returns:
             Tuple of (Game object, is_new: bool)
         """
+        # The provider's game id is the natural key used to decide between insert and update.
         game_id = game_data.get("game_id")
 
         # Check if game already exists
+        # Look for a stored copy of this game.
         existing_game = db.query(Game).filter(Game.game_id == game_id).first()
 
         if existing_game:
             # Update existing game
             for key, value in game_data.items():
+                # Only copy keys that are real columns, ignoring any extras.
                 if hasattr(existing_game, key):
                     setattr(existing_game, key, value)
 
+            # Record when the row was last refreshed.
             existing_game.updated_at = datetime.utcnow()
             db.commit()
+            # Reload from the database so the returned object holds current values.
             db.refresh(existing_game)
 
             logger.info(f"Updated game: {game_id}")
@@ -50,6 +62,7 @@ class GameService:
 
         else:
             # Create new game
+            # Build a new row directly from the dictionary's keys.
             new_game = Game(**game_data)
             db.add(new_game)
             db.commit()
@@ -82,9 +95,11 @@ class GameService:
         Returns:
             List of Game objects
         """
+        # Start with all games in the league.
         query = db.query(Game).filter(Game.league == league)
 
         if not include_final:
+            # Drop finished games when only in-progress or upcoming ones are wanted.
             query = query.filter(Game.is_final == False)
 
         games = query.order_by(Game.date.desc()).limit(limit).all()
@@ -109,6 +124,7 @@ class GameService:
         Returns:
             List of Game objects
         """
+        # Oldest date to include, computed in UTC.
         cutoff_date = datetime.utcnow() - timedelta(days=days)
 
         games = (
@@ -142,6 +158,7 @@ class GameService:
         games = (
             db.query(Game)
             .filter(
+                # Case-insensitive partial match on either the home or the away team.
                 (Game.home_team.ilike(f"%{team_name}%")) |
                 (Game.away_team.ilike(f"%{team_name}%"))
             )
@@ -167,6 +184,7 @@ class GameService:
         """
         cutoff_date = datetime.utcnow() - timedelta(days=days)
 
+        # Bulk delete in one statement; the count of removed rows is returned.
         deleted = (
             db.query(Game)
             .filter(Game.date < cutoff_date)
@@ -195,6 +213,7 @@ class GameService:
         if league:
             query = query.filter(Game.league == league)
 
+        # Let the database count rows instead of loading them.
         count = query.count()
         return count
 
@@ -241,6 +260,7 @@ class GameService:
         """
         query = db.query(Game)
 
+        # Filters the database can do directly are applied in SQL first.
         # Apply filters
         if league:
             query = query.filter(Game.league == league)
@@ -266,6 +286,7 @@ class GameService:
         if away_team:
             query = query.filter(Game.away_team.ilike(f"%{away_team}%"))
 
+        # Total score and score difference are computed in Python after loading, so they run on the already-filtered rows.
         # Score-based filters (need to be applied to results after query)
         games = query.all()
 
@@ -278,6 +299,7 @@ class GameService:
         if close_game_threshold is not None:
             games = [g for g in games if abs(g.home_score - g.away_score) <= close_game_threshold]
 
+        # Sorting is also done in Python because it depends on computed values.
         # Sort
         if sort_by == "home_score":
             games = sorted(games, key=lambda g: g.home_score, reverse=not ascending)
@@ -291,6 +313,7 @@ class GameService:
             games = sorted(games, key=lambda g: g.date, reverse=not ascending)
 
         logger.info(f"Retrieved {len(games[:limit])} filtered games")
+        # Apply the limit last so sorting sees all matching games.
         return games[:limit]
 
     @staticmethod
@@ -312,6 +335,7 @@ class GameService:
         Returns:
             List of high-scoring games
         """
+        # Only finished games count here, so partial scores are ignored.
         query = db.query(Game).filter(Game.is_final == True)
 
         if league:
@@ -319,6 +343,7 @@ class GameService:
 
         games = query.all()
         high_scoring = [g for g in games if (g.home_score + g.away_score) >= threshold]
+        # Highest combined score first.
         high_scoring.sort(key=lambda g: (g.home_score + g.away_score), reverse=True)
 
         logger.info(f"Retrieved {len(high_scoring[:limit])} high-scoring games (threshold: {threshold})")
@@ -350,6 +375,7 @@ class GameService:
 
         games = query.all()
         close_games = [g for g in games if abs(g.home_score - g.away_score) <= max_diff]
+        # Smallest margin first.
         close_games.sort(key=lambda g: abs(g.home_score - g.away_score))
 
         logger.info(f"Retrieved {len(close_games[:limit])} close games (max diff: {max_diff})")
@@ -399,9 +425,11 @@ class GameService:
         Returns:
             Dictionary of aggregate statistics
         """
+        # Result maps each group label to a count.
         stats = {}
 
         if group_by == "league":
+            # Imported here because only the aggregate branches need it.
             from sqlalchemy import func
             results = (
                 db.query(Game.league, func.count(Game.id))
@@ -425,6 +453,7 @@ class GameService:
             stats = {"final": final_count, "live": live_count}
 
         elif group_by == "date":
+            # Only the most recent week is counted.
             # Group by date (last 7 days)
             from sqlalchemy import func
             cutoff = datetime.utcnow() - timedelta(days=7)
@@ -445,4 +474,5 @@ class GameService:
 
 
 # Singleton instance
+# Shared instance imported by the API layer.
 game_service = GameService()

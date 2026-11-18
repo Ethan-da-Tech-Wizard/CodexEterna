@@ -1,21 +1,31 @@
+// Program: CodexEterna - dashboard.js
+// Programmer: Ethan-da-Tech-Wizard (written with Claude, an AI assistant)
+// Last Modified: 2026-11-18
+// Purpose: Browser script for the dashboard: ping table with local generation and sorting, calls to the ping, crypto and sports APIs, local-storage persistence, tab switching and theme customization.
 // Real-Time Data Pipeline Dashboard JavaScript
 
 // Configuration
+// --- Configuration: where the backend services live and display limits ---
 const PING_SERVICE_URL = window.location.origin;
 const SPORTS_SERVICE_URL = 'http://localhost:5001';
 const MAX_TABLE_ROWS = 1000;
 const UPDATE_THROTTLE_MS = 100;
 
 // State
+// --- State shared by the functions below ---
 let connection = null;
+// Whether the in-browser ping generator is paused.
 let isPaused = true; // Start paused
+// Coordinates seen so far, keyed by the text 'latitude,longitude'.
 let coordinateData = new Map();
 let updateQueue = [];
 let lastUpdateTime = 0;
 let pingGeneratorInterval = null;
+// Sort order currently applied to the ping table.
 let currentSortMode = 'count-desc';
 
 // Initialize dashboard on page load
+// Runs once the page markup is ready: restores saved data, wires events and starts the browser-side ping generator (the server connection is currently switched off by the commented-out call below).
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing Real-Time Data Pipeline Dashboard...');
 
@@ -38,6 +48,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 // SignalR Connection Management
 // ============================================================================
 
+/**
+ * Opens the SignalR connection to the server hub with automatic reconnect
+ * (backoff doubles from 1 second up to a 30 second cap), registers the message
+ * handlers and updates the connection status text.
+ *
+ * @returns {Promise<void>}
+ */
 async function initializeSignalR() {
     try {
         // Create SignalR connection
@@ -45,7 +62,8 @@ async function initializeSignalR() {
             .withUrl(`${PING_SERVICE_URL}/hubs/ping`)
             .withAutomaticReconnect({
                 nextRetryDelayInMilliseconds: retryContext => {
-                    // Exponential backoff: 2s, 4s, 8s, 16s, 30s
+                    // retryContext.previousRetryCount counts earlier failed attempts.
+                    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, then capped at 30s
                     return Math.min(1000 * Math.pow(2, retryContext.previousRetryCount), 30000);
                 }
             })
@@ -83,6 +101,11 @@ async function initializeSignalR() {
     }
 }
 
+/**
+ * Tries to start the SignalR connection again unless it is already connected.
+ *
+ * @returns {Promise<void>}
+ */
 async function reconnect() {
     if (connection && connection.state === signalR.HubConnectionState.Connected) {
         console.log('Already connected');
@@ -104,6 +127,11 @@ async function reconnect() {
 // SignalR Event Handlers
 // ============================================================================
 
+/**
+ * Receives a batch of ping updates from the server, queues them and processes the queue at most once per throttle window.
+ *
+ * @param {Array<{latitude:number, longitude:number, count:number, timestamp:string}>} updates
+ */
 function handlePingBatch(updates) {
     // Add updates to queue for throttled processing
     updateQueue.push(...updates);
@@ -116,6 +144,9 @@ function handlePingBatch(updates) {
     }
 }
 
+/**
+ * Moves every queued update into the coordinate map and redraws the table.
+ */
 function processUpdateQueue() {
     if (updateQueue.length === 0) return;
 
@@ -136,6 +167,11 @@ function processUpdateQueue() {
     updatePingTable();
 }
 
+/**
+ * Shows server statistics in the stat cards and syncs the pause state.
+ *
+ * @param {Object} stats - statistics object sent by the server
+ */
 function handleStats(stats) {
     // Update stat cards
     updateStatValue('totalPings', stats.totalPingsGenerated.toLocaleString());
@@ -153,6 +189,12 @@ function handleStats(stats) {
 // UI Update Functions
 // ============================================================================
 
+/**
+ * Sets a stat card's text and briefly flashes it, but only when the value changed.
+ *
+ * @param {string} elementId - id of the element to update
+ * @param {string} value - new text
+ */
 function updateStatValue(elementId, value) {
     const element = document.getElementById(elementId);
     if (element && element.textContent !== value) {
@@ -162,6 +204,12 @@ function updateStatValue(elementId, value) {
     }
 }
 
+/**
+ * Shows the connection state text, colored green, amber or red by type.
+ *
+ * @param {string} status - text to display
+ * @param {string} type - 'success', 'warning' or 'error'
+ */
 function updateConnectionStatus(status, type) {
     const element = document.getElementById('connectionStatus');
     if (element) {
@@ -173,6 +221,11 @@ function updateConnectionStatus(status, type) {
     }
 }
 
+/**
+ * Updates the status dot, status text and pause button label to match the pause state.
+ *
+ * @param {boolean} paused
+ */
 function updatePauseStatus(paused) {
     const statusDot = document.querySelector('#pingStatus .status-dot');
     const statusText = document.querySelector('#pingStatus .status-text');
@@ -189,6 +242,9 @@ function updatePauseStatus(paused) {
     }
 }
 
+/**
+ * First version: draws the ping table sorted by count. A later function with the same name redefines it, and the later one is what runs.
+ */
 function updatePingTable() {
     const tbody = document.getElementById('pingTableBody');
     const noDataMessage = document.getElementById('noDataMessage');
@@ -223,6 +279,11 @@ function updatePingTable() {
 // Control Functions
 // ============================================================================
 
+/**
+ * First version: asks the server to pause or resume. A later function with the same name replaces it, so this one is not used.
+ *
+ * @returns {Promise<void>}
+ */
 async function togglePause() {
     try {
         const endpoint = isPaused ? '/api/ping/resume' : '/api/ping/pause';
@@ -243,6 +304,11 @@ async function togglePause() {
     }
 }
 
+/**
+ * First version: asks the server to reset after confirmation. Replaced by a later definition with the same name.
+ *
+ * @returns {Promise<void>}
+ */
 async function resetSystem() {
     if (!confirm('Are you sure you want to reset all data?')) {
         return;
@@ -265,6 +331,11 @@ async function resetSystem() {
     }
 }
 
+/**
+ * First version: searches coordinates on the server by text pattern. Replaced by a later definition with the same name.
+ *
+ * @returns {Promise<void>}
+ */
 async function searchCoordinates() {
     const searchInput = document.getElementById('searchInput');
     const pattern = searchInput.value.trim();
@@ -290,6 +361,11 @@ async function searchCoordinates() {
     }
 }
 
+/**
+ * Loads the 100 most frequent coordinates from the server and shows them in the table.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadTopCoordinates() {
     try {
         const response = await fetch(`${PING_SERVICE_URL}/api/ping/top?count=100`);
@@ -305,6 +381,11 @@ async function loadTopCoordinates() {
     }
 }
 
+/**
+ * Replaces the table contents with the given server results.
+ *
+ * @param {Array<Object>} results - coordinate objects from the API
+ */
 function displaySearchResults(results) {
     coordinateData.clear();
 
@@ -325,6 +406,11 @@ function displaySearchResults(results) {
 // Sports Data Functions
 // ============================================================================
 
+/**
+ * First version: asks the sports service to fetch a league, then reloads the stored games. Replaced by a later definition with the same name.
+ *
+ * @returns {Promise<void>}
+ */
 async function fetchSportsData() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -356,6 +442,11 @@ async function fetchSportsData() {
     }
 }
 
+/**
+ * First version: loads stored games for the selected league from the sports service. Replaced by a later definition with the same name.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadStoredGames() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -384,6 +475,11 @@ async function loadStoredGames() {
     }
 }
 
+/**
+ * First version: renders game cards from the sports service. Replaced by a later definition with the same name.
+ *
+ * @param {Array<Object>} games
+ */
 function displayGames(games) {
     const sportsData = document.getElementById('sportsData');
 
@@ -410,6 +506,12 @@ function displayGames(games) {
 // Utility Functions
 // ============================================================================
 
+/**
+ * Trims a server time span such as hours:minutes:seconds.fraction down to hours:minutes:seconds.
+ *
+ * @param {string} uptime
+ * @returns {string}
+ */
 function formatUptime(uptime) {
     // uptime format: "00:01:23.4567890"
     if (!uptime) return '00:00:00';
@@ -425,6 +527,12 @@ function formatUptime(uptime) {
     return uptime;
 }
 
+/**
+ * Formats a timestamp as a local time of day, or N/A when missing.
+ *
+ * @param {string} timestamp
+ * @returns {string}
+ */
 function formatTime(timestamp) {
     if (!timestamp) return 'N/A';
 
@@ -432,6 +540,12 @@ function formatTime(timestamp) {
     return date.toLocaleTimeString();
 }
 
+/**
+ * Formats a date string as local date and time, or N/A when missing.
+ *
+ * @param {string} dateString
+ * @returns {string}
+ */
 function formatDate(dateString) {
     if (!dateString) return 'N/A';
 
@@ -439,6 +553,9 @@ function formatDate(dateString) {
     return date.toLocaleString();
 }
 
+/**
+ * Hooks up the Enter key in the search box, restores saved theme settings, sets the pause button state and starts periodic and on-exit saving of ping data.
+ */
 function setupEventHandlers() {
     // Allow Enter key to trigger search
     document.getElementById('searchInput').addEventListener('keypress', (e) => {
@@ -468,6 +585,9 @@ function setupEventHandlers() {
 // Random Ping Generation System
 // ============================================================================
 
+/**
+ * Starts (or restarts) a once-per-second timer that creates random pings in the browser while not paused.
+ */
 function startPingGenerator() {
     if (pingGeneratorInterval) {
         clearInterval(pingGeneratorInterval);
@@ -483,7 +603,11 @@ function startPingGenerator() {
     console.log('Ping generator started');
 }
 
+/**
+ * Creates 5 to 15 random coordinates, adds them to the map (counting repeats), then refreshes the table and totals.
+ */
 function generateRandomPings() {
+    // Math.random() gives 0 to 0.99; times 11 plus 5 yields whole numbers from 5 to 15.
     // Generate 5-15 random coordinates per second
     const numPings = Math.floor(Math.random() * 11) + 5;
 
@@ -523,6 +647,11 @@ function generateRandomPings() {
 // Table Sorting Functions
 // ============================================================================
 
+/**
+ * Sorts the coordinates by the chosen mode and redraws the table.
+ *
+ * @param {string} mode - one of count-desc, count-asc, time-desc, time-asc, lat-asc, lat-desc, lng-asc, lng-desc
+ */
 function sortTable(mode) {
     currentSortMode = mode;
 
@@ -552,10 +681,18 @@ function sortTable(mode) {
     updatePingTableWithData(sortedData);
 }
 
+/**
+ * Redraws the table using the current sort mode. This later definition replaces the earlier function of the same name.
+ */
 function updatePingTable() {
     sortTable(currentSortMode);
 }
 
+/**
+ * Renders already-sorted coordinates into the table body, limited to the maximum row count.
+ *
+ * @param {Array<Object>} sortedData
+ */
 function updatePingTableWithData(sortedData) {
     const tbody = document.getElementById('pingTableBody');
     const noDataMessage = document.getElementById('noDataMessage');
@@ -588,6 +725,9 @@ function updatePingTableWithData(sortedData) {
 // LocalStorage Persistence
 // ============================================================================
 
+/**
+ * Saves the coordinate map to the browser's local storage as JSON.
+ */
 function savePingDataToStorage() {
     try {
         const dataArray = Array.from(coordinateData.entries());
@@ -598,6 +738,9 @@ function savePingDataToStorage() {
     }
 }
 
+/**
+ * Restores the coordinate map from local storage and refreshes the table and totals.
+ */
 function loadSavedPingData() {
     try {
         const saved = localStorage.getItem('codexeterna_ping_data');
@@ -619,6 +762,9 @@ function loadSavedPingData() {
     }
 }
 
+/**
+ * After confirmation, deletes saved ping data from storage and clears the table.
+ */
 function clearSavedData() {
     if (!confirm('Clear all saved ping data? This cannot be undone.')) {
         return;
@@ -638,12 +784,18 @@ function clearSavedData() {
 // Updated Control Functions
 // ============================================================================
 
+/**
+ * Flips the local pause flag and updates the button. This later definition replaces the earlier server-based function of the same name.
+ */
 function togglePause() {
     isPaused = !isPaused;
     updatePauseButtonState();
     console.log(isPaused ? 'Paused' : 'Resumed');
 }
 
+/**
+ * Sets the pause button's color and label to match the pause flag.
+ */
 function updatePauseButtonState() {
     const btn = document.getElementById('pauseBtn');
     const btnText = document.getElementById('pauseBtnText');
@@ -657,6 +809,9 @@ function updatePauseButtonState() {
     }
 }
 
+/**
+ * After confirmation, clears the current in-memory coordinates but keeps saved data. Replaces the earlier function of the same name.
+ */
 function resetSystem() {
     if (!confirm('Reset all ping data? This will clear the current session but keep saved data.')) {
         return;
@@ -676,6 +831,11 @@ function resetSystem() {
 // Fixed Sports Data Functions
 // ============================================================================
 
+/**
+ * Fetches a league from the sports service and falls back to calling the public scoreboard service directly if that fails. Replaces the earlier function of the same name.
+ *
+ * @returns {Promise<void>}
+ */
 async function fetchSportsData() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -708,6 +868,12 @@ async function fetchSportsData() {
     }
 }
 
+/**
+ * Requests the scoreboard for a league straight from the public sports API and displays it.
+ *
+ * @param {string} sport - league path such as 'football/nfl'
+ * @returns {Promise<void>}
+ */
 async function fetchFromESPNDirectly(sport) {
     const sportsData = document.getElementById('sportsData');
 
@@ -728,6 +894,11 @@ async function fetchFromESPNDirectly(sport) {
     }
 }
 
+/**
+ * Renders game cards from a raw scoreboard response and stores the response in history.
+ *
+ * @param {Object} data - scoreboard JSON
+ */
 function displayESPNGames(data) {
     const sportsData = document.getElementById('sportsData');
 
@@ -767,6 +938,12 @@ function displayESPNGames(data) {
 // Historical Sports Data Management
 // ============================================================================
 
+/**
+ * Appends a scoreboard response to the saved history, grouped by league and by calendar day.
+ *
+ * @param {string} sport
+ * @param {Object} data
+ */
 function storeSportsDataWithTimestamp(sport, data) {
     try {
         // Get existing sports history
@@ -798,6 +975,9 @@ function storeSportsDataWithTimestamp(sport, data) {
     }
 }
 
+/**
+ * Shows every saved fetch for the selected league and date.
+ */
 function filterSportsByDate() {
     const dateFilter = document.getElementById('dateFilter').value;
     const sportSelect = document.getElementById('sportSelect');
@@ -853,6 +1033,9 @@ function filterSportsByDate() {
     }
 }
 
+/**
+ * Clears the date filter and reloads the current games.
+ */
 function showAllSportsData() {
     // Clear date filter
     document.getElementById('dateFilter').value = '';
@@ -861,6 +1044,9 @@ function showAllSportsData() {
     loadStoredGames();
 }
 
+/**
+ * After confirmation, deletes all saved sports history.
+ */
 function clearSportsHistory() {
     if (!confirm('Clear all historical sports data? This cannot be undone.')) {
         return;
@@ -872,6 +1058,9 @@ function clearSportsHistory() {
     console.log('Cleared sports history');
 }
 
+/**
+ * Counts the saved history records and shows the total.
+ */
 function updateHistorySummary() {
     try {
         const sportsHistory = JSON.parse(localStorage.getItem('codexeterna_sports_history')) || {};
@@ -889,6 +1078,11 @@ function updateHistorySummary() {
     }
 }
 
+/**
+ * Loads games from the sports service and falls back to the public scoreboard if it is down. Replaces the earlier function of the same name.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadStoredGames() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -925,6 +1119,11 @@ async function loadStoredGames() {
     }
 }
 
+/**
+ * Renders game cards (away team first). Replaces the earlier function of the same name.
+ *
+ * @param {Array<Object>} games
+ */
 function displayGames(games) {
     const sportsData = document.getElementById('sportsData');
 
@@ -947,6 +1146,11 @@ function displayGames(games) {
     sportsData.innerHTML = html;
 }
 
+/**
+ * Filters the in-memory coordinates by text and shows matches by count. Replaces the earlier server-based function of the same name.
+ *
+ * @returns {Promise<void>}
+ */
 async function searchCoordinates() {
     const searchInput = document.getElementById('searchInput');
     const pattern = searchInput.value.trim();
@@ -980,6 +1184,11 @@ async function searchCoordinates() {
 // Start/Stop System Controls with Confirmation
 // ============================================================================
 
+/**
+ * After confirmation, asks the server to start ping generation and updates buttons.
+ *
+ * @returns {Promise<void>}
+ */
 async function startPingSystem() {
     if (!confirm('⚠️ START PING COLLECTION?\n\nThis will generate 20,000 coordinates per second and consume significant memory.\n\nClick OK to confirm and begin data collection.')) {
         return;
@@ -1005,6 +1214,11 @@ async function startPingSystem() {
     }
 }
 
+/**
+ * After confirmation, asks the server to stop ping generation and updates buttons.
+ *
+ * @returns {Promise<void>}
+ */
 async function stopPingSystem() {
     if (!confirm('⏹️ STOP PING COLLECTION?\n\nThis will IMMEDIATELY cease all ping generation.\n\nClick OK to confirm.')) {
         return;
@@ -1030,6 +1244,11 @@ async function stopPingSystem() {
     }
 }
 
+/**
+ * After confirmation, asks the server to start crypto monitoring and begins polling its statistics.
+ *
+ * @returns {Promise<void>}
+ */
 async function startCryptoSystem() {
     if (!confirm('🔗 START CRYPTO MONITORING?\n\nThis will connect to Binance WebSocket for real-time BTC/USDT price monitoring.\n\nSnapshots will be taken every 10 minutes and timestamped.\n\nClick OK to confirm.')) {
         return;
@@ -1063,6 +1282,11 @@ async function startCryptoSystem() {
     }
 }
 
+/**
+ * After confirmation, asks the server to stop crypto monitoring and stops polling.
+ *
+ * @returns {Promise<void>}
+ */
 async function stopCryptoSystem() {
     if (!confirm('⏹️ STOP CRYPTO MONITORING?\n\nThis will IMMEDIATELY disconnect from Binance and cease all crypto data collection.\n\nClick OK to confirm.')) {
         return;
@@ -1100,8 +1324,12 @@ async function stopCryptoSystem() {
 // Crypto Price Polling
 // ============================================================================
 
+// Handle of the polling timer, or null when not polling.
 let cryptoPriceInterval = null;
 
+/**
+ * Fetches crypto statistics from the server every 2 seconds.
+ */
 function startCryptoPricePolling() {
     if (cryptoPriceInterval) clearInterval(cryptoPriceInterval);
 
@@ -1118,6 +1346,9 @@ function startCryptoPricePolling() {
     }, 2000); // Poll every 2 seconds
 }
 
+/**
+ * Stops the polling timer.
+ */
 function stopCryptoPricePolling() {
     if (cryptoPriceInterval) {
         clearInterval(cryptoPriceInterval);
@@ -1125,6 +1356,11 @@ function stopCryptoPricePolling() {
     }
 }
 
+/**
+ * Shows price, high, low and snapshot count in the crypto cards.
+ *
+ * @param {Object} stats - statistics from the crypto API
+ */
 function updateCryptoStats(stats) {
     document.getElementById('cryptoPrice').textContent = '$' + stats.currentPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('cryptoHigh').textContent = '$' + stats.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -1132,6 +1368,11 @@ function updateCryptoStats(stats) {
     document.getElementById('cryptoSnapshots').textContent = stats.totalSnapshots;
 }
 
+/**
+ * Loads every stored crypto snapshot from the server and shows it.
+ *
+ * @returns {Promise<void>}
+ */
 async function loadCryptoSnapshots() {
     try {
         const response = await fetch(`${PING_SERVICE_URL}/api/crypto/snapshots`);
@@ -1147,6 +1388,11 @@ async function loadCryptoSnapshots() {
     }
 }
 
+/**
+ * Renders snapshots as cards, or a message when there are none.
+ *
+ * @param {Array<Object>} snapshots
+ */
 function displayCryptoSnapshots(snapshots) {
     const cryptoData = document.getElementById('cryptoData');
 
@@ -1173,6 +1419,11 @@ function displayCryptoSnapshots(snapshots) {
     cryptoData.innerHTML = html;
 }
 
+/**
+ * Loads snapshots for the chosen day (00:00:00 to 23:59:59 UTC).
+ *
+ * @returns {Promise<void>}
+ */
 async function filterCryptoByDate() {
     const dateFilter = document.getElementById('cryptoDateFilter').value;
 
@@ -1202,6 +1453,9 @@ async function filterCryptoByDate() {
     }
 }
 
+/**
+ * Clears the date filter and reloads all snapshots.
+ */
 function showAllCryptoData() {
     document.getElementById('cryptoDateFilter').value = '';
     loadCryptoSnapshots();
@@ -1211,6 +1465,11 @@ function showAllCryptoData() {
 // Tab Switching Functionality
 // ============================================================================
 
+/**
+ * Shows the chosen tab's panel and hides the others.
+ *
+ * @param {string} tabName - 'ping', 'crypto' or 'sports'
+ */
 function switchTab(tabName) {
     // Update tab buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1241,6 +1500,7 @@ function switchTab(tabName) {
 // ============================================================================
 
 // Professional Theme Presets
+// Each preset gives two background gradient colors and the accent colors used for the primary, success, warning, danger and info styles.
 const THEME_PRESETS = {
     'executive-dark': {
         color1: '#1a1d29',
@@ -1299,12 +1559,20 @@ const THEME_PRESETS = {
 };
 
 // Settings Panel Toggle
+/**
+ * Opens or closes the settings panel.
+ */
 function toggleSettings() {
     const panel = document.getElementById('settingsPanel');
     panel.classList.toggle('active');
 }
 
 // Apply Theme Preset
+/**
+ * Applies a named color preset to the page and saves it.
+ *
+ * @param {string} presetName - key of THEME_PRESETS
+ */
 function applyPreset(presetName) {
     const preset = THEME_PRESETS[presetName];
     if (!preset) return;
@@ -1332,6 +1600,9 @@ function applyPreset(presetName) {
 }
 
 // Apply Custom Gradient
+/**
+ * Applies the two picked colors and the angle as the page background and saves them.
+ */
 function applyCustomGradient() {
     const color1 = document.getElementById('customColor1').value;
     const color2 = document.getElementById('customColor2').value;
@@ -1352,6 +1623,9 @@ function applyCustomGradient() {
 }
 
 // Update Panel Colors
+/**
+ * Derives panel, card and dark backgrounds from the first background color, shifting each channel slightly.
+ */
 function updatePanelColors() {
     const color1 = getComputedStyle(document.documentElement).getPropertyValue('--bg-color-1').trim();
     const opacity = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--panel-bg').split(',')[3]) || 0.95;
@@ -1367,6 +1641,12 @@ function updatePanelColors() {
 }
 
 // Hex to RGB Conversion
+/**
+ * Converts a hex color like #1a2b3c to red, green and blue numbers.
+ *
+ * @param {string} hex
+ * @returns {{r:number, g:number, b:number}|null} null if the text is not a valid hex color
+ */
 function hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -1378,6 +1658,9 @@ function hexToRgb(hex) {
 
 
 // Toggle Blur Effect
+/**
+ * Turns the frosted-glass blur on or off and saves the choice.
+ */
 function toggleBlur() {
     const enabled = document.getElementById('blurEnabled').checked;
 
@@ -1393,6 +1676,9 @@ function toggleBlur() {
 }
 
 // Toggle Animations
+/**
+ * Turns transitions and animations on or off and saves the choice.
+ */
 function toggleAnimations() {
     const enabled = document.getElementById('animationsEnabled').checked;
 
@@ -1408,6 +1694,9 @@ function toggleAnimations() {
 }
 
 // Update Opacity
+/**
+ * Applies the panel transparency slider value to panel, card and dark backgrounds and saves it.
+ */
 function updateOpacity() {
     const opacity = document.getElementById('panelOpacity').value;
     document.getElementById('opacityValue').textContent = opacity;
@@ -1427,6 +1716,9 @@ function updateOpacity() {
 }
 
 // Save Settings to LocalStorage
+/**
+ * Saves the current theme control values to local storage.
+ */
 function saveSettings() {
     const settings = {
         bgColor1: document.getElementById('customColor1').value,
@@ -1441,6 +1733,9 @@ function saveSettings() {
 }
 
 // Load Saved Settings
+/**
+ * Restores saved theme control values and applies them.
+ */
 function loadSavedSettings() {
     const saved = localStorage.getItem('codexeterna_settings');
     if (!saved) return;
@@ -1481,6 +1776,9 @@ function loadSavedSettings() {
 }
 
 // Reset Settings to Default
+/**
+ * After confirmation, clears saved settings and restores the default theme and controls.
+ */
 function resetSettings() {
     if (!confirm('Reset all customizations to default?')) {
         return;
@@ -1515,6 +1813,7 @@ function resetSettings() {
 // ============================================================================
 
 // Core functions
+// Inline onclick attributes look functions up on window, so each needed function is attached here.
 window.togglePause = togglePause;
 window.resetSystem = resetSystem;
 window.reconnect = reconnect;
@@ -1553,6 +1852,7 @@ window.toggleAnimations = toggleAnimations;
 window.updateOpacity = updateOpacity;
 window.resetSettings = resetSettings;
 
+// Startup banner shown in the browser console.
 console.log('==================================================');
 console.log('CodexEterna Data Pipeline v2.0 - UI Loaded');
 console.log('==================================================');
