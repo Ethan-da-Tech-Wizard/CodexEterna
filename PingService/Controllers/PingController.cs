@@ -1,3 +1,11 @@
+// ==============================================================================
+// Program: PingController.cs
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: High-throughput REST API controller exposing management operations and
+//          statistical queries for the simulated geospatial ping generation pipeline.
+//          Supports real-time frequency tuning, geographic search, and occurrence ranking.
+// ==============================================================================
 using Microsoft.AspNetCore.Mvc;
 using PingService.Models;
 using PingService.Services;
@@ -25,6 +33,7 @@ public class PingController : ControllerBase
     /// <summary>
     /// Get current system statistics
     /// </summary>
+    // Step 1: Query global pipeline throughput and coordinate uniqueness statistics
     [HttpGet("stats")]
     public ActionResult<PingStats> GetStats()
     {
@@ -34,6 +43,7 @@ public class PingController : ControllerBase
     /// <summary>
     /// Get top N coordinates by occurrence count
     /// </summary>
+    // Step 2: Retrieve the top N most frequently generated coordinate pairs
     [HttpGet("top")]
     public ActionResult<IEnumerable<CoordinatePing>> GetTopCoordinates([FromQuery] int count = 100)
     {
@@ -46,6 +56,7 @@ public class PingController : ControllerBase
     /// <summary>
     /// Search for coordinates matching a pattern
     /// </summary>
+    // Step 3: Perform prefix/substring pattern matching across cached coordinate keys
     [HttpGet("search")]
     public ActionResult<IEnumerable<CoordinatePing>> SearchCoordinates(
         [FromQuery] string pattern,

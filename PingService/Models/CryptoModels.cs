@@ -1,8 +1,17 @@
+// ==============================================================================
+// Program: CryptoModels.cs
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: Data models defining cryptocurrency trade ticks, periodic 10-minute
+//          aggregate snapshots, and runtime engine monitoring statistics for the
+//          Binance market data pipeline.
+// ==============================================================================
 namespace PingService.Models;
 
 /// <summary>
 /// Represents a 10-minute snapshot of crypto data
 /// </summary>
+// Step 1: Immutable snapshot model representing OHLC-style price windows
 public class CryptoSnapshot
 {
     public string Id { get; set; } = string.Empty;
@@ -18,6 +27,7 @@ public class CryptoSnapshot
 /// <summary>
 /// Represents a single crypto trade
 /// </summary>
+// Step 2: Atomic trade tick model received from Binance WebSocket stream
 public class CryptoTrade
 {
     public string Symbol { get; set; } = string.Empty;
@@ -29,6 +39,7 @@ public class CryptoTrade
 /// <summary>
 /// Current crypto monitoring statistics
 /// </summary>
+// Step 3: Runtime operational metrics tracking feed health and extrema
 public class CryptoStats
 {
     public bool IsRunning { get; set; }

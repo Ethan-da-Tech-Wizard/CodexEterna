@@ -1,3 +1,11 @@
+// ==============================================================================
+// Program: CryptoController.cs
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: REST API controller providing operational control and telemetry query
+//          endpoints for the Binance cryptocurrency price ingestion engine. Exposes
+//          manual lifecycle management (start/stop) and snapshot historical retrieval.
+// ==============================================================================
 using Microsoft.AspNetCore.Mvc;
 using PingService.Models;
 using PingService.Services;
@@ -25,6 +33,7 @@ public class CryptoController : ControllerBase
     /// <summary>
     /// Start crypto monitoring (requires manual confirmation from user)
     /// </summary>
+    // Step 1: Validate system state and initiate cryptocurrency telemetry collection
     [HttpPost("start")]
     public IActionResult Start()
     {
@@ -44,6 +53,7 @@ public class CryptoController : ControllerBase
     /// <summary>
     /// Stop crypto monitoring immediately (ceases all operations)
     /// </summary>
+    // Step 2: Gracefully terminate active WebSocket connections and background collection loops
     [HttpPost("stop")]
     public async Task<IActionResult> Stop()
     {
@@ -62,6 +72,7 @@ public class CryptoController : ControllerBase
     /// <summary>
     /// Get current crypto statistics
     /// </summary>
+    // Step 3: Query in-memory aggregated statistics (high, low, latest spot price, uptime)
     [HttpGet("stats")]
     public ActionResult<CryptoStats> GetStats()
     {
@@ -71,6 +82,7 @@ public class CryptoController : ControllerBase
     /// <summary>
     /// Get all crypto snapshots
     /// </summary>
+    // Step 4: Retrieve historical 10-minute snapshot records for external analytics
     [HttpGet("snapshots")]
     public ActionResult<IEnumerable<CryptoSnapshot>> GetAllSnapshots()
     {

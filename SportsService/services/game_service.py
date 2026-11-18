@@ -1,3 +1,10 @@
+# ==============================================================================
+# Program: game_service.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: Business logic service managing database persistence, upserts, query
+#          filtering, and historical aggregations for sports events.
+# ==============================================================================
 """
 Game Service - Database operations for games
 """
@@ -19,6 +26,7 @@ class GameService:
     """
 
     @staticmethod
+    # Step 1: Perform idempotent upsert of game records based on external game_id
     def create_or_update_game(db: Session, game_data: dict) -> tuple[Game, bool]:
         """
         Create a new game or update existing one

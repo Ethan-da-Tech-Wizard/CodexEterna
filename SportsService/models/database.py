@@ -1,3 +1,10 @@
+# ==============================================================================
+# Program: database.py
+# Programmer: Ethan-da-Tech-Wizard
+# Last Modified: November 18, 2026
+# Purpose: SQLAlchemy ORM entity definitions and database connection engine
+#          configuration for the Sports Data Service.
+# ==============================================================================
 """
 Database models and configuration for Sports Data Service
 """
@@ -23,6 +30,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+# Step 1: Core relational entity storing game scores, timestamps, and status
 class Game(Base):
     """
     Represents a sports game/match
@@ -51,6 +59,7 @@ class Game(Base):
         return f"<Game {self.home_team} vs {self.away_team} ({self.league})>"
 
 
+# Step 2: Relational entity storing franchise information, logos, and records
 class Team(Base):
     """
     Represents a sports team

@@ -1,3 +1,11 @@
+// ==============================================================================
+// Program: PingGeneratorService.cs
+// Programmer: Ethan-da-Tech-Wizard
+// Last Modified: November 18, 2026
+// Purpose: High-performance background service generating 20,000 synthetic coordinate
+//          pings per second. Utilizes thread-safe concurrent collections, batching
+//          queues, and throttled SignalR multicasting to simulate global sensor telemetry.
+// ==============================================================================
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.AspNetCore.SignalR;
@@ -52,6 +60,7 @@ public class PingGeneratorService : BackgroundService
         _stopwatch = new Stopwatch();
     }
 
+    // Step 1: Initialize parallel worker tasks for generation, broadcasting, and diagnostics
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _startTime = DateTime.UtcNow;
@@ -70,6 +79,7 @@ public class PingGeneratorService : BackgroundService
     /// <summary>
     /// Main ping generation loop - targets 20,000 pings/second
     /// </summary>
+    // Step 2: High-throughput batch generation loop executing up to target frequency
     private async Task GeneratePingsAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Starting ping generation at {Rate} pings/second", TARGET_PINGS_PER_SECOND);
@@ -136,6 +146,7 @@ public class PingGeneratorService : BackgroundService
     /// <summary>
     /// Batch and broadcast updates to connected clients
     /// </summary>
+    // Step 3: Multicast batch updates via SignalR at bounded client refresh intervals
     private async Task BroadcastUpdatesAsync(CancellationToken stoppingToken)
     {
         var updates = new List<PingUpdate>(1000);
@@ -175,6 +186,7 @@ public class PingGeneratorService : BackgroundService
     /// <summary>
     /// Periodically broadcast system statistics
     /// </summary>
+    // Step 4: Compute and emit aggregate throughput and memory utilization metrics
     private async Task BroadcastStatsAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
