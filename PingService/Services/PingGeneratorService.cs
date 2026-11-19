@@ -43,7 +43,11 @@ public class PingGeneratorService : BackgroundService
     private readonly ConcurrentQueue<PingUpdate> _updateQueue;
     private readonly SemaphoreSlim _updateSemaphore;
 
-    // Random number generation (thread-safe via ThreadStatic)
+    // Thread-safe random number generation using thread-local storage ([ThreadStatic]).
+    // Concurrency Design Rationale:
+    // System.Random is NOT thread-safe; sharing an instance across parallel threads causes race conditions
+    // and zero-returns. Using locks on a single Random causes severe lock contention at 20,000 ops/sec.
+    // [ThreadStatic] gives each executing thread its own independent generator instance with zero lock overhead.
     [ThreadStatic]
     private static Random? _random;
     private static Random RandomInstance => _random ??= new Random();
