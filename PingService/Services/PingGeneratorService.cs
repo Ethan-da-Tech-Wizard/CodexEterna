@@ -56,8 +56,6 @@ public class PingGeneratorService : BackgroundService
     // For batching updates to clients
     // Buffer between the generator (producer) and the broadcaster (consumer).
     private readonly ConcurrentQueue<PingUpdate> _updateQueue;
-    // Created but not currently used by any method in this class.
-    private readonly SemaphoreSlim _updateSemaphore;
 
     // Thread-safe random number generation using thread-local storage ([ThreadStatic]).
     // Concurrency Design Rationale:
@@ -79,7 +77,6 @@ public class PingGeneratorService : BackgroundService
         _logger = logger;
         _coordinateCounts = new ConcurrentDictionary<string, CoordinatePing>();
         _updateQueue = new ConcurrentQueue<PingUpdate>();
-        _updateSemaphore = new SemaphoreSlim(1, 1);
         _stopwatch = new Stopwatch();
     }
 
@@ -187,8 +184,8 @@ public class PingGeneratorService : BackgroundService
     // Step 3: Multicast batch updates via SignalR at bounded client refresh intervals
     // Consumer loop: every 100 ms, drain up to 1000 queued updates and send them as one batch
     // ("ReceivePingBatch") instead of 20,000 individual messages per second.
-    // Note: when the queue holds more than 1000, TryDequeue removes one extra item before the
-    // count check ends the loop, so one update per cycle is dropped.
+    // The batch size is checked BEFORE dequeuing (see DrainBatch), so items beyond the cap stay
+    // queued for the next cycle instead of being removed and lost.
     private async Task BroadcastUpdatesAsync(CancellationToken stoppingToken)
     {
         var updates = new List<PingUpdate>(1000);
@@ -202,10 +199,7 @@ public class PingGeneratorService : BackgroundService
 
             // Dequeue updates
             updates.Clear();
-            while (_updateQueue.TryDequeue(out var update) && updates.Count < 1000)
-            {
-                updates.Add(update);
-            }
+            DrainBatch(_updateQueue, updates, 1000);
 
             if (updates.Count > 0)
             {
@@ -224,6 +218,27 @@ public class PingGeneratorService : BackgroundService
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Moves up to <paramref name="maxItems"/> updates from the queue into <paramref name="target"/>.
+    /// </summary>
+    /// <remarks>
+    /// The limit is tested before TryDequeue so that an item is never removed from the queue
+    /// without being added to the batch (the earlier loop checked the limit afterwards and lost
+    /// one update every time the queue held more than the cap).
+    /// </remarks>
+    /// <returns>The number of items moved.</returns>
+    public static int DrainBatch(ConcurrentQueue<PingUpdate> queue, List<PingUpdate> target, int maxItems)
+    {
+        var moved = 0;
+        // Cap first, dequeue second: that order is the whole fix.
+        while (moved < maxItems && queue.TryDequeue(out var update))
+        {
+            target.Add(update);
+            moved++;
+        }
+        return moved;
     }
 
     /// <summary>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Offline-friendly regression check (no xunit/NuGet test packages needed): a console app that
+       exits non-zero on failure. Run from the repo root: dotnet run, pointing its project option at this folder. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../PingService/PingService.csproj" />
+  </ItemGroup>
+</Project>
