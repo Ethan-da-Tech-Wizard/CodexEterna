@@ -56,16 +56,27 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Add CORS for cross-origin requests
-// Permissive CORS policy named "AllowAll": any origin, method and header.
-// Fine for a local dashboard, but should be restricted if exposed beyond localhost.
+// Restricted policy named "AllowConfiguredOrigins": only the origins listed (comma separated) in the
+// CORS_ALLOWED_ORIGINS environment variable may call the API from a browser. The default is the
+// dashboard's own origin on localhost:5000. A wildcard entry is rejected at startup because the
+// SignalR hub needs credentials, which cannot be combined with "any origin". CORS is enforced by
+// browsers only; it is not an authentication mechanism.
+var allowedOrigins = (Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS")
+        ?? "http://localhost:5000,http://127.0.0.1:5000")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+if (allowedOrigins.Contains("*"))
+{
+    throw new InvalidOperationException("CORS_ALLOWED_ORIGINS must list explicit origins; '*' is not allowed");
+}
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", builder =>
+    options.AddPolicy("AllowConfiguredOrigins", policy =>
     {
-        builder
-            .AllowAnyOrigin()
+        policy
+            .WithOrigins(allowedOrigins)
             .AllowAnyMethod()
-            .AllowAnyHeader();
+            .AllowAnyHeader()
+            .AllowCredentials();
     });
 });
 
@@ -86,7 +97,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Middleware order matters: CORS before routing so preflight requests are answered.
-app.UseCors("AllowAll");
+app.UseCors("AllowConfiguredOrigins");
 
 // Serve wwwroot/index.html as the default document and other static dashboard assets.
 app.UseDefaultFiles();
