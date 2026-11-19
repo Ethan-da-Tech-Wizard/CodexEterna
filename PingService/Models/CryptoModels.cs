@@ -12,8 +12,9 @@ namespace PingService.Models;
 /// <summary>
 /// Represents a 10-minute snapshot of crypto data
 /// </summary>
-// Step 1: Immutable snapshot model representing OHLC-style price windows
-// NOTE: the step label above says 'immutable', but the properties have public setters.
+// Step 1: Snapshot model representing OHLC-style price windows
+// NOTE: this class is mutable (public setters); it is only treated as read-only by convention
+// once CryptoService has stored it.
 // A snapshot summarises one interval (default 10 minutes) of the BTC/USDT feed.
 public class CryptoSnapshot
 {
