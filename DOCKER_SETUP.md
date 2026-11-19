@@ -99,7 +99,7 @@ services:
     container_name: sportsdb           # ← Name Docker Desktop shows
     environment:                       # ← Environment variables
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}   # from .env, see .env.example
       POSTGRES_DB: sportsdata
     volumes:
       - sportsdb_data:/var/lib/postgresql/data  # ← Persistent storage
@@ -115,7 +115,7 @@ services:
       dockerfile: Dockerfile
     container_name: sportsservice
     environment:
-      DATABASE_URL: postgresql://postgres:secret@sportsdb:5432/sportsdata
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@sportsdb:5432/sportsdata
     ports:
       - "5001:5001"
     depends_on:                         # ← Wait for database to be healthy
@@ -464,7 +464,7 @@ networks:
 **Benefits:**
 1. ✅ Containers can talk to each other by name:
    ```
-   postgresql://postgres:secret@sportsdb:5432/sportsdata
+   postgresql://postgres:<your-password>@sportsdb:5432/sportsdata
                                ↑
                           Container name (not IP!)
    ```

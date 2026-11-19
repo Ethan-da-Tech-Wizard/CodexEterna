@@ -3,7 +3,7 @@
 # Programmer: Ethan-da-Tech-Wizard
 # Last Modified: November 18, 2026
 # Purpose: SQLAlchemy ORM entity definitions and database connection engine
-#          configuration for the Sports Data Service.
+#          configuration for the Sports Data Service (PostgreSQL via DATABASE_URL).
 # ==============================================================================
 """
 Database models and configuration for Sports Data Service
@@ -14,17 +14,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 # datetime.utcnow is used as the default for created_at/updated_at timestamps (naive UTC).
 from datetime import datetime
-import os
+from models.config import get_database_url
 
-# Database URL from environment variable or default to SQLite
-# Connection string for SQLAlchemy, read once at import time (later environment changes
-# have no effect). NOTE: the comment above says the fallback is SQLite, but it is in fact
-# a PostgreSQL URL for the compose service 'sportsdb'. docker-compose.yml also sets
-# DATABASE_URL explicitly, so this default only applies outside that setup.
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:secret@sportsdb:5432/sportsdata"
-)
+# Connection string for SQLAlchemy (PostgreSQL in the compose setup), read once at import
+# time, so later environment changes have no effect. DATABASE_URL is REQUIRED: there is no
+# fallback, because a built-in default password would be shipped to every deployment that
+# forgot to override it. get_database_url raises RuntimeError with setup instructions.
+DATABASE_URL = get_database_url()
 
 # Create engine
 # Shared engine (connection pool). echo=True logs every SQL statement: handy for

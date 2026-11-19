@@ -5,11 +5,11 @@ services:
     image: postgres:15-alpine
     container_name: sportsdb
     environment:
-      # SECURITY NOTE: the database password is hard-coded as 'secret' (also in DATABASE_URL below
-      # and as the fallback in models/database.py). Acceptable for local development only; use
-      # env files or secrets for anything shared.
+      # The password comes from the environment / a local .env file (copy .env.example to .env).
+      # The ':?' form makes `docker compose` abort with this message when it is unset, so there
+      # is no insecure default. .env is git-ignored; never commit a real password.
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
       POSTGRES_DB: sportsdata
     volumes:
       # Named volume so database contents survive container recreation.
@@ -35,8 +35,10 @@ services:
       dockerfile: Dockerfile
     container_name: sportsservice
     environment:
-      # Host 'sportsdb' resolves through the compose network by service name.
-      DATABASE_URL: postgresql://postgres:secret@sportsdb:5432/sportsdata
+      # Host 'sportsdb' resolves through the compose network by service name. The password is
+      # interpolated from the same variable as the database container, so the two cannot drift.
+      # Use a password without URL-special characters (@ : / ? #) or percent-encode it.
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}@sportsdb:5432/sportsdata
       PYTHONUNBUFFERED: 1
     ports:
       - "5001:5001"

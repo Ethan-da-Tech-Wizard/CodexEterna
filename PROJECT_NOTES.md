@@ -563,7 +563,7 @@ ASPNETCORE_URLS=http://+:5000
 
 **SportsService:**
 ```env
-DATABASE_URL=postgresql://postgres:secret@sportsdb:5432/sportsdata
+DATABASE_URL=postgresql://postgres:<POSTGRES_PASSWORD from .env>@sportsdb:5432/sportsdata
 PYTHONUNBUFFERED=1
 ```
 

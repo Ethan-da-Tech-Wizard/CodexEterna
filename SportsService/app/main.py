@@ -3,7 +3,7 @@
 # Programmer: Ethan-da-Tech-Wizard
 # Last Modified: November 18, 2026
 # Purpose: FastAPI application server providing RESTful endpoints for sports data
-#          aggregation from ESPN APIs, persistent SQLite storage, and query filtering.
+#          aggregation from ESPN APIs, persistent PostgreSQL storage, and query filtering.
 # ==============================================================================
 """
 Sports Data Service - FastAPI Application

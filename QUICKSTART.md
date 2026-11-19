@@ -88,6 +88,12 @@ When you open the project, VS Code will suggest extensions. Click "Install All" 
    - ⚠️ **CRITICAL:** Select the ROOT folder (where `docker-compose.yml` is)
    - NOT a subfolder like `PingService` or `SportsService`
 
+### Step 1b: Create your `.env` (one-time)
+
+Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD` to a password of your choice
+(for example `openssl rand -hex 24`). The stack will not start without it, because the
+repository no longer ships a default database password. `.env` is git-ignored.
+
 ### Step 2: Start Docker Services
 
 Press **`Ctrl+Shift+B`** on your keyboard
