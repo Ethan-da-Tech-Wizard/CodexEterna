@@ -12,8 +12,8 @@ namespace PingService.Models;
 /// <summary>
 /// Represents a geographic coordinate with its occurrence count
 /// </summary>
-// Step 1: Thread-safe data model tracking coordinate occurrences and timestamps
-// NOTE: despite the step label above, instances are NOT internally thread-safe. The generator
+// Step 1: Mutable data model tracking coordinate occurrences and timestamps
+// NOTE: instances are NOT internally thread-safe (plain auto-properties). The generator
 // mutates Count/LastSeen from several threads via ConcurrentDictionary.AddOrUpdate, so counts
 // are approximate under heavy contention.
 public class CoordinatePing
