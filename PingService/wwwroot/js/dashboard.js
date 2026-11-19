@@ -7,17 +7,36 @@
 //          rendering for 20k/sec coordinate streams, Binance crypto pricing, and
 //          RESTful sports scoreboard fetching.
 // ==============================================================================
+// How this file fits: PingService/wwwroot/index.html loads it as the only script (after the SignalR client). The page is served by PingService (ASP.NET),
+// which also exposes the /api/ping and /api/crypto routes and the SignalR hub at /hubs/ping. The sports tab talks to the separate Python SportsService on port 5001,
+// and falls back to the public ESPN scoreboard endpoint when that service is down.
+// IMPORTANT quirk for maintainers: this file grew by appending newer versions of some functions below older ones. In JavaScript the LAST declaration of a
+// function name wins, so the earlier copies of togglePause, resetSystem, updatePingTable, fetchSportsData, loadStoredGames, displayGames and searchCoordinates are
+// dead code. Each is labelled below. The live behaviour is "browser-local demo": pings are generated in this page, not by the server (the SignalR path is switched off).
+// Known limit: several templates insert API text with innerHTML without escaping; that is acceptable only because the data sources are trusted services.
+
 // Real-Time Data Pipeline Dashboard JavaScript
 
 // Configuration
+// Same origin as the page, so no CORS configuration is needed for the ping and crypto APIs.
 const PING_SERVICE_URL = window.location.origin;
+
+// Hard-coded to the SportsService default port; change it here if docker-compose maps the service elsewhere.
 const SPORTS_SERVICE_URL = 'http://localhost:5001';
+
+// Rendering thousands of <tr> elements freezes the page, so only the top 1000 rows are ever drawn.
 const MAX_TABLE_ROWS = 1000;
+
+// Minimum gap between table redraws when batches arrive over SignalR (see handlePingBatch).
 const UPDATE_THROTTLE_MS = 100;
 
 // State
 let connection = null;
+
+// The page starts paused so opening the dashboard never begins generating data without the user asking.
 let isPaused = true; // Start paused
+
+// Key is "lat,lng" text so repeated coordinates are merged into one row with a count; Map keeps insertion order and is fast for this lookup.
 let coordinateData = new Map();
 let updateQueue = [];
 let lastUpdateTime = 0;
@@ -33,6 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadSavedPingData();
 
     // Initialize SignalR (optional - for real backend connection)
+    // Left disabled: the dashboard currently runs on locally generated pings, so it does not need the server connection to function.
     // await initializeSignalR();
 
     // Setup event handlers and start ping generator
@@ -54,6 +74,8 @@ async function initializeSignalR() {
         // Create SignalR connection
         connection = new signalR.HubConnectionBuilder()
             .withUrl(`${PING_SERVICE_URL}/hubs/ping`)
+
+            // A custom delay function replaces the default schedule: retry delay doubles on each failed attempt and stops growing at 30 s.
             .withAutomaticReconnect({
                 nextRetryDelayInMilliseconds: retryContext => {
                     // Exponential backoff: 2s, 4s, 8s, 16s, 30s
@@ -94,6 +116,7 @@ async function initializeSignalR() {
     }
 }
 
+// Manual retry hook. Needs initializeSignalR to have created `connection` first, otherwise `connection` is null and the call throws (caught below).
 async function reconnect() {
     if (connection && connection.state === signalR.HubConnectionState.Connected) {
         console.log('Already connected');
@@ -115,6 +138,7 @@ async function reconnect() {
 // SignalR Event Handlers
 // ============================================================================
 
+// Batches from the server arrive far faster than the screen can usefully redraw, so they are queued and flushed at most every 100 ms.
 function handlePingBatch(updates) {
     // Add updates to queue for throttled processing
     updateQueue.push(...updates);
@@ -127,6 +151,7 @@ function handlePingBatch(updates) {
     }
 }
 
+// splice(0, length) empties the queue in one step, so batches arriving during the loop are kept for the next flush rather than lost.
 function processUpdateQueue() {
     if (updateQueue.length === 0) return;
 
@@ -147,6 +172,7 @@ function processUpdateQueue() {
     updatePingTable();
 }
 
+// Server-side stats override the local pause state so the button always reflects what the server is actually doing.
 function handleStats(stats) {
     // Update stat cards
     updateStatValue('totalPings', stats.totalPingsGenerated.toLocaleString());
@@ -164,6 +190,7 @@ function handleStats(stats) {
 // UI Update Functions
 // ============================================================================
 
+// Only touches the DOM when the text really changed; the temporary "updated" class lets CSS flash the card to draw the eye.
 function updateStatValue(elementId, value) {
     const element = document.getElementById(elementId);
     if (element && element.textContent !== value) {
@@ -173,6 +200,7 @@ function updateStatValue(elementId, value) {
     }
 }
 
+// Colours are set inline (not through classes) because this one element switches colour on every state change.
 function updateConnectionStatus(status, type) {
     const element = document.getElementById('connectionStatus');
     if (element) {
@@ -200,6 +228,7 @@ function updatePauseStatus(paused) {
     }
 }
 
+// (DEAD CODE: replaced by the later updatePingTable that delegates to sortTable.) This version always sorted by count.
 function updatePingTable() {
     const tbody = document.getElementById('pingTableBody');
     const noDataMessage = document.getElementById('noDataMessage');
@@ -234,6 +263,7 @@ function updatePingTable() {
 // Control Functions
 // ============================================================================
 
+// (DEAD CODE: replaced by the later togglePause below.) This version asked the server to pause or resume via /api/ping/pause and /api/ping/resume.
 async function togglePause() {
     try {
         const endpoint = isPaused ? '/api/ping/resume' : '/api/ping/pause';
@@ -254,6 +284,7 @@ async function togglePause() {
     }
 }
 
+// (DEAD CODE: replaced by the later resetSystem, which only clears the browser session.) This version called the server reset endpoint.
 async function resetSystem() {
     if (!confirm('Are you sure you want to reset all data?')) {
         return;
@@ -276,6 +307,7 @@ async function resetSystem() {
     }
 }
 
+// (DEAD CODE: replaced by the later local search below.) This version called /api/ping/search on the server.
 async function searchCoordinates() {
     const searchInput = document.getElementById('searchInput');
     const pattern = searchInput.value.trim();
@@ -337,6 +369,7 @@ function displaySearchResults(results) {
 // ============================================================================
 
 // Step 5: Query backend SportsService for live scores and schedule updates
+// (DEAD CODE: replaced by the later version that falls back to ESPN directly.)
 async function fetchSportsData() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -368,6 +401,7 @@ async function fetchSportsData() {
     }
 }
 
+// (DEAD CODE: replaced by the later version with an ESPN fallback.)
 async function loadStoredGames() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -396,6 +430,7 @@ async function loadStoredGames() {
     }
 }
 
+// (DEAD CODE: replaced by the later version that guards against missing team names and scores.)
 function displayGames(games) {
     const sportsData = document.getElementById('sportsData');
 
@@ -422,6 +457,7 @@ function displayGames(games) {
 // Utility Functions
 // ============================================================================
 
+// The server sends a .NET TimeSpan string; fractional seconds are cut off because the stat card only has room for hh:mm:ss.
 function formatUptime(uptime) {
     // uptime format: "00:01:23.4567890"
     if (!uptime) return '00:00:00';
@@ -451,6 +487,7 @@ function formatDate(dateString) {
     return date.toLocaleString();
 }
 
+// Wiring that must happen after the DOM exists; called once from DOMContentLoaded.
 function setupEventHandlers() {
     // Allow Enter key to trigger search
     document.getElementById('searchInput').addEventListener('keypress', (e) => {
@@ -471,6 +508,7 @@ function setupEventHandlers() {
     });
 
     // Auto-save every 10 seconds
+    // Autosave every 10 s in addition to beforeunload, because browsers do not reliably fire beforeunload on a crash or mobile tab discard.
     setInterval(() => {
         savePingDataToStorage();
     }, 10000);
@@ -480,6 +518,7 @@ function setupEventHandlers() {
 // Random Ping Generation System
 // ============================================================================
 
+// Clearing the old timer first makes the function safe to call twice without doubling the rate.
 function startPingGenerator() {
     if (pingGeneratorInterval) {
         clearInterval(pingGeneratorInterval);
@@ -495,12 +534,14 @@ function startPingGenerator() {
     console.log('Ping generator started');
 }
 
+// Demo generator: 5 to 15 random points per second. Random 6-decimal coordinates almost never repeat, so counts here stay at 1; the server generator also rounds to 6 decimals, so its counts behave the same way.
 function generateRandomPings() {
     // Generate 5-15 random coordinates per second
     const numPings = Math.floor(Math.random() * 11) + 5;
 
     for (let i = 0; i < numPings; i++) {
         // Generate random latitude (-90 to 90) and longitude (-180 to 180)
+        // toFixed returns a string, which makes the "lat,lng" Map key stable; the number is parsed back when the row object is created.
         const latitude = (Math.random() * 180 - 90).toFixed(6);
         const longitude = (Math.random() * 360 - 180).toFixed(6);
 
@@ -535,6 +576,7 @@ function generateRandomPings() {
 // Table Sorting Functions
 // ============================================================================
 
+// currentSortMode is remembered so later refreshes (new pings, search) keep the user's chosen order.
 function sortTable(mode) {
     currentSortMode = mode;
 
@@ -564,10 +606,12 @@ function sortTable(mode) {
     updatePingTableWithData(sortedData);
 }
 
+// Thin wrapper so every caller that "updates the table" respects the current sort mode.
 function updatePingTable() {
     sortTable(currentSortMode);
 }
 
+// Single place that renders rows, used by sort, search and refresh, so the 1000-row cap is enforced everywhere.
 function updatePingTableWithData(sortedData) {
     const tbody = document.getElementById('pingTableBody');
     const noDataMessage = document.getElementById('noDataMessage');
@@ -600,6 +644,7 @@ function updatePingTableWithData(sortedData) {
 // LocalStorage Persistence
 // ============================================================================
 
+// Map -> array of [key, value] pairs, because JSON.stringify cannot serialise a Map directly. Errors (quota full, private mode) are logged, not fatal.
 function savePingDataToStorage() {
     try {
         const dataArray = Array.from(coordinateData.entries());
@@ -610,6 +655,7 @@ function savePingDataToStorage() {
     }
 }
 
+// new Map(array) rebuilds the Map from the saved pairs, restoring counts across page reloads.
 function loadSavedPingData() {
     try {
         const saved = localStorage.getItem('codexeterna_ping_data');
@@ -650,6 +696,7 @@ function clearSavedData() {
 // Updated Control Functions
 // ============================================================================
 
+// LIVE version: purely local, flips the flag that startPingGenerator checks every second.
 function togglePause() {
     isPaused = !isPaused;
     updatePauseButtonState();
@@ -669,6 +716,7 @@ function updatePauseButtonState() {
     }
 }
 
+// LIVE version: clears this session's data. Saved localStorage data stays until clearSavedData is used, and will reappear on the next reload.
 function resetSystem() {
     if (!confirm('Reset all ping data? This will clear the current session but keep saved data.')) {
         return;
@@ -688,6 +736,7 @@ function resetSystem() {
 // Fixed Sports Data Functions
 // ============================================================================
 
+// LIVE version. Order of attempts: SportsService first, ESPN directly if it fails or is unreachable.
 async function fetchSportsData() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -709,6 +758,7 @@ async function fetchSportsData() {
             console.log('Sports data fetched:', data);
 
             // Wait a moment then load stored games
+            // Short delay gives the SportsService time to store the fetched games before they are read back.
             setTimeout(() => loadStoredGames(), 1000);
         } else {
             // Fallback: Use ESPN API directly if service is down
@@ -720,6 +770,7 @@ async function fetchSportsData() {
     }
 }
 
+// Public ESPN scoreboard endpoint; the `sport` value is a path such as "football/nfl" taken from the dropdown.
 async function fetchFromESPNDirectly(sport) {
     const sportsData = document.getElementById('sportsData');
 
@@ -740,6 +791,7 @@ async function fetchFromESPNDirectly(sport) {
     }
 }
 
+// ESPN's JSON nests competitors under competitions[0]; home and away are found by the homeAway field because their order is not guaranteed.
 function displayESPNGames(data) {
     const sportsData = document.getElementById('sportsData');
 
@@ -751,6 +803,8 @@ function displayESPNGames(data) {
     // Store data with timestamp
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
+
+    // Every successful display is also archived in the browser so the date filter can show past results offline.
     storeSportsDataWithTimestamp(sport, data);
 
     const html = data.events.map(event => {
@@ -779,6 +833,7 @@ function displayESPNGames(data) {
 // Historical Sports Data Management
 // ============================================================================
 
+// Storage layout: history[sport][YYYY-MM-DD] is a list of {timestamp, data} snapshots, so several fetches on one day are all kept.
 function storeSportsDataWithTimestamp(sport, data) {
     try {
         // Get existing sports history
@@ -901,6 +956,7 @@ function updateHistorySummary() {
     }
 }
 
+// LIVE version: if the SportsService cannot be reached, it shows ESPN data instead of an error.
 async function loadStoredGames() {
     const sportSelect = document.getElementById('sportSelect');
     const sport = sportSelect.value;
@@ -959,6 +1015,7 @@ function displayGames(games) {
     sportsData.innerHTML = html;
 }
 
+// LIVE version: filters the local Map by substring (so "40." matches many coordinates), sorted by count. No server call is made.
 async function searchCoordinates() {
     const searchInput = document.getElementById('searchInput');
     const pattern = searchInput.value.trim();
@@ -992,6 +1049,7 @@ async function searchCoordinates() {
 // Start/Stop System Controls with Confirmation
 // ============================================================================
 
+// Confirmation dialogs guard the two heavy actions: the server generator creates 20,000 pings per second and uses a lot of memory.
 async function startPingSystem() {
     if (!confirm('⚠️ START PING COLLECTION?\n\nThis will generate 20,000 coordinates per second and consume significant memory.\n\nClick OK to confirm and begin data collection.')) {
         return;
@@ -1042,6 +1100,7 @@ async function stopPingSystem() {
     }
 }
 
+// Starting the server-side Binance connection also starts polling, so the stat cards update without further clicks.
 async function startCryptoSystem() {
     if (!confirm('🔗 START CRYPTO MONITORING?\n\nThis will connect to Binance WebSocket for real-time BTC/USDT price monitoring.\n\nSnapshots will be taken every 10 minutes and timestamped.\n\nClick OK to confirm.')) {
         return;
@@ -1114,6 +1173,7 @@ async function stopCryptoSystem() {
 
 let cryptoPriceInterval = null;
 
+// Polls every 2 s because crypto stats are not pushed over SignalR; a previous timer is cleared first to avoid two timers running.
 function startCryptoPricePolling() {
     if (cryptoPriceInterval) clearInterval(cryptoPriceInterval);
 
@@ -1137,6 +1197,7 @@ function stopCryptoPricePolling() {
     }
 }
 
+// en-US with two decimals gives fixed-width prices like $64,250.10 regardless of the viewer's locale.
 function updateCryptoStats(stats) {
     document.getElementById('cryptoPrice').textContent = '$' + stats.currentPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     document.getElementById('cryptoHigh').textContent = '$' + stats.highPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -1185,6 +1246,7 @@ function displayCryptoSnapshots(snapshots) {
     cryptoData.innerHTML = html;
 }
 
+// A selected day becomes the range 00:00:00Z to 23:59:59Z in UTC, because snapshots are stored with UTC timestamps.
 async function filterCryptoByDate() {
     const dateFilter = document.getElementById('cryptoDateFilter').value;
 
@@ -1223,6 +1285,7 @@ function showAllCryptoData() {
 // Tab Switching Functionality
 // ============================================================================
 
+// Tabs are plain show/hide: the active class marks both the button and its panel; the sports tab also refreshes its history summary when opened.
 function switchTab(tabName) {
     // Update tab buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1253,6 +1316,7 @@ function switchTab(tabName) {
 // ============================================================================
 
 // Professional Theme Presets
+// Each preset lists two background gradient colours plus the five semantic colours; applyPreset copies them into CSS custom properties.
 const THEME_PRESETS = {
     'executive-dark': {
         color1: '#1a1d29',
@@ -1311,12 +1375,14 @@ const THEME_PRESETS = {
 };
 
 // Settings Panel Toggle
+// The settings drawer is shown by the "active" class; its CSS lives in dashboard.css.
 function toggleSettings() {
     const panel = document.getElementById('settingsPanel');
     panel.classList.toggle('active');
 }
 
 // Apply Theme Preset
+// All colours flow through CSS custom properties on <html>, so one setProperty call restyles every panel without touching individual elements.
 function applyPreset(presetName) {
     const preset = THEME_PRESETS[presetName];
     if (!preset) return;
@@ -1335,6 +1401,7 @@ function applyPreset(presetName) {
     document.getElementById('customColor2').value = preset.color2;
 
     // Update panel backgrounds
+    // Panel backgrounds are derived from the new first background colour, so they must be recomputed whenever it changes.
     updatePanelColors();
 
     // Save settings
@@ -1364,6 +1431,7 @@ function applyCustomGradient() {
 }
 
 // Update Panel Colors
+// Panels are slightly lighter than the page background (channels + 8..20) so they stand out, and the darker variant is slightly darker. The additions are not clamped at 255, so a very light background can produce out-of-range channel values that the browser clamps itself.
 function updatePanelColors() {
     const color1 = getComputedStyle(document.documentElement).getPropertyValue('--bg-color-1').trim();
     const opacity = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--panel-bg').split(',')[3]) || 0.95;
@@ -1379,6 +1447,7 @@ function updatePanelColors() {
 }
 
 // Hex to RGB Conversion
+// Returns null for anything that is not a 6-digit hex colour, so callers can skip the update instead of producing "NaN" colours.
 function hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -1390,6 +1459,7 @@ function hexToRgb(hex) {
 
 
 // Toggle Blur Effect
+// Backdrop blur is costly on weak GPUs, so users can turn it off; the CSS reads --blur-amount.
 function toggleBlur() {
     const enabled = document.getElementById('blurEnabled').checked;
 
@@ -1420,6 +1490,7 @@ function toggleAnimations() {
 }
 
 // Update Opacity
+// Same colour math as updatePanelColors but with the slider value; the card layer is kept 0.15 more transparent than the panel layer for depth.
 function updateOpacity() {
     const opacity = document.getElementById('panelOpacity').value;
     document.getElementById('opacityValue').textContent = opacity;
@@ -1439,6 +1510,7 @@ function updateOpacity() {
 }
 
 // Save Settings to LocalStorage
+// Only the user-editable inputs are stored (not derived colours); loadSavedSettings re-derives everything from them.
 function saveSettings() {
     const settings = {
         bgColor1: document.getElementById('customColor1').value,
@@ -1453,6 +1525,7 @@ function saveSettings() {
 }
 
 // Load Saved Settings
+// `!== false` treats a missing flag as enabled, so first-time visitors and older saved settings get the default look.
 function loadSavedSettings() {
     const saved = localStorage.getItem('codexeterna_settings');
     if (!saved) return;
