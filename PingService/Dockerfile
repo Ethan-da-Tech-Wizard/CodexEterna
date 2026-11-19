@@ -40,10 +40,12 @@ ENV ASPNETCORE_URLS=http://+:5000
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Health check
-# NOTE: uses curl, which the aspnet runtime image does not normally include, so this check
-# may report unhealthy unless curl is installed. /api/ping/health is the endpoint probed.
+# The aspnet runtime image ships neither curl nor wget, so the old `curl -f` check always failed
+# and the container reported unhealthy. Debian's bash is present, so the check opens a TCP
+# connection with bash's built-in /dev/tcp, sends a minimal HTTP/1.0 GET to /api/ping/health and
+# passes only if the status line contains " 200 ". No packages are added to the image.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/api/ping/health || exit 1
+    CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/5000 && printf "GET /api/ping/health HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3 && head -n1 <&3 | grep -q " 200 "' || exit 1
 
 # Run the application
 # Start the published app; PingService.dll is the build output of PingService.csproj.
