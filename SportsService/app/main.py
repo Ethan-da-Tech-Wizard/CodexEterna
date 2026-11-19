@@ -9,6 +9,7 @@
 Sports Data Service - FastAPI Application
 Fetches and stores sports data from ESPN API
 """
+# FastAPI framework pieces: routing, dependency injection, HTTP errors and query validation.
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -16,6 +17,8 @@ from typing import List, Optional
 from datetime import datetime
 import logging
 
+# Absolute imports (models., services.) rely on /app being the working directory
+# and on sys.path, as in the Docker image (`uvicorn app.main:app` run from /app).
 from models.database import get_db, init_db, engine
 from models.schemas import (
     GameResponse,
@@ -33,6 +36,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app
+# The ASGI application object; uvicorn imports it as app.main:app.
 app = FastAPI(
     title="Sports Data Service",
     description="Real-time sports data aggregation from ESPN API with persistent storage",
@@ -40,6 +44,8 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+# SECURITY NOTE: origins/methods/headers are all '*' while credentials are allowed.
+# That is convenient for local development but too permissive for a public deployment.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,6 +57,9 @@ app.add_middleware(
 
 # Step 1: Initialize database schema and verify table availability on startup
 @app.on_event("startup")
+# Runs once when the server starts. Table creation is idempotent, so it is safe even
+# though the Docker CMD already ran init_db.py. @app.on_event is deprecated in newer
+# FastAPI in favour of lifespan handlers but still works.
 async def startup_event():
     """Initialize database on startup"""
     logger.info("Starting Sports Data Service...")
@@ -60,11 +69,13 @@ async def startup_event():
         init_db()
         logger.info("Database initialized successfully")
     except Exception as e:
+        # Failure is logged but not fatal: /health will report the database state instead.
         logger.error(f"Failed to initialize database: {e}")
         # Don't crash the app, but log the error
 
 
 @app.get("/")
+# Service index listing the main endpoints; useful as a quick liveness check.
 async def root():
     """Root endpoint"""
     return {
@@ -81,6 +92,8 @@ async def root():
 
 
 @app.get("/health", response_model=HealthResponse)
+# Health probe used by the Docker HEALTHCHECK. Runs a real count query, so it
+# returns 503 when the database is unreachable rather than just proving the process is up.
 async def health_check(db: Session = Depends(get_db)):
     """Health check endpoint"""
     try:
@@ -98,6 +111,10 @@ async def health_check(db: Session = Depends(get_db)):
 
 
 @app.get("/api/sports/fetch", response_model=FetchResponse)
+# Pull the current scoreboard for one league from ESPN and upsert every game.
+# Note: the ESPN and DB calls are synchronous and run inside an async handler, so they
+# block the event loop for their duration.
+# Unsupported leagues raise ValueError in the ESPN client and become HTTP 400.
 async def fetch_sports_data(
     league: str = Query(..., description="League to fetch (e.g., 'football/nfl', 'basketball/nba')"),
     db: Session = Depends(get_db)
@@ -131,6 +148,7 @@ async def fetch_sports_data(
         games_created = 0
         games_updated = 0
 
+        # Upsert one game at a time (each call commits); tallies new versus updated rows.
         for game_data in games_data:
             game, is_new = game_service.create_or_update_game(db, game_data)
 
@@ -154,6 +172,7 @@ async def fetch_sports_data(
             games_updated=games_updated
         )
 
+    # ValueError here means an unsupported league (raised by the ESPN client).
     except ValueError as e:
         logger.error(f"Invalid league: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -164,6 +183,8 @@ async def fetch_sports_data(
 
 
 @app.get("/api/sports/games", response_model=List[GameResponse])
+# List stored games. Filter precedence is team, then days, then league; only the
+# first one supplied is applied. With no filter, the last 7 days are returned.
 async def get_games(
     league: Optional[str] = Query(None, description="Filter by league"),
     team: Optional[str] = Query(None, description="Filter by team name"),
@@ -205,6 +226,7 @@ async def get_games(
 
 
 @app.get("/api/sports/game/{game_id}", response_model=GameResponse)
+# Fetch one game by its external id; 404 if unknown.
 async def get_game(
     game_id: str,
     db: Session = Depends(get_db)
@@ -227,6 +249,8 @@ async def get_game(
 
         return game
 
+    # Re-raise deliberate HTTP errors (e.g. 404) so the generic handler below
+    # does not convert them into 500 responses.
     except HTTPException:
         raise
     except Exception as e:
@@ -235,6 +259,8 @@ async def get_game(
 
 
 @app.get("/api/sports/filter", response_model=List[GameResponse])
+# Advanced search. Dates are accepted as YYYY-MM-DD strings and parsed here;
+# date_to is midnight at the start of that day, so games later that day are excluded.
 async def get_filtered_games(
     league: Optional[str] = Query(None, description="Filter by league"),
     status: Optional[str] = Query(None, description="Filter by game status"),
@@ -304,6 +330,7 @@ async def get_filtered_games(
 
 
 @app.get("/api/sports/high-scoring", response_model=List[GameResponse])
+# Finished games with combined score at or above the threshold (50-300 allowed).
 async def get_high_scoring_games(
     threshold: int = Query(100, ge=50, le=300, description="Minimum total score"),
     league: Optional[str] = Query(None, description="Filter by league"),
@@ -326,6 +353,7 @@ async def get_high_scoring_games(
 
 
 @app.get("/api/sports/close-games", response_model=List[GameResponse])
+# Finished games decided by at most max_diff points (1-20 allowed).
 async def get_close_games(
     max_diff: int = Query(5, ge=1, le=20, description="Maximum score difference"),
     league: Optional[str] = Query(None, description="Filter by league"),
@@ -348,6 +376,7 @@ async def get_close_games(
 
 
 @app.get("/api/sports/by-status", response_model=List[GameResponse])
+# Games whose status text contains the given text (case-insensitive).
 async def get_games_by_status(
     status: str = Query(..., description="Status to filter by (e.g., 'Final', 'Live', 'Q4')"),
     league: Optional[str] = Query(None, description="Filter by league"),
@@ -369,6 +398,8 @@ async def get_games_by_status(
 
 
 @app.get("/api/sports/aggregate")
+# Counts of games grouped by league, status, final/live or date.
+# The group_by value is validated against a whitelist before reaching the service.
 async def get_aggregate_statistics(
     group_by: str = Query("league", description="Group by: league, status, final, date"),
     db: Session = Depends(get_db)
@@ -403,6 +434,7 @@ async def get_aggregate_statistics(
 
 
 @app.get("/api/sports/leagues")
+# Expose the league whitelist from the ESPN client plus friendly aliases.
 async def get_supported_leagues():
     """
     Get list of supported leagues
@@ -424,6 +456,8 @@ async def get_supported_leagues():
 
 
 @app.delete("/api/sports/cleanup")
+# Delete games older than N days (1-365). SECURITY NOTE: destructive and has no
+# authentication, so it should not be exposed publicly as-is.
 async def cleanup_old_games(
     days: int = Query(30, ge=1, le=365, description="Delete games older than N days"),
     db: Session = Depends(get_db)
@@ -455,6 +489,7 @@ async def cleanup_old_games(
 
 
 @app.get("/api/sports/stats")
+# Overall and per-league game counts. Issues one COUNT query per supported league.
 async def get_stats(db: Session = Depends(get_db)):
     """
     Get statistics about stored data
@@ -488,6 +523,8 @@ async def get_stats(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
 
+# Development entry point only; the container runs uvicorn via the Dockerfile CMD.
+# reload=True watches for code changes and host 0.0.0.0 listens on all interfaces.
 if __name__ == "__main__":
     import uvicorn
 

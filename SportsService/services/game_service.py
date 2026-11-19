@@ -8,11 +8,14 @@
 """
 Game Service - Database operations for games
 """
+# Session type is used only for annotations; callers (FastAPI dependencies) own its lifecycle.
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
 import logging
 
+# ORM entities and request schemas. Resolved via the service's working directory
+# (/app in Docker), not as a relative package import.
 from models.database import Game, Team
 from models.schemas import GameCreate, GameUpdate
 
@@ -20,6 +23,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# Stateless collection of static query helpers. All methods take the Session as the
+# first argument, so the class holds no state and the module singleton is safe to share.
 class GameService:
     """
     Service for managing games in the database
@@ -38,17 +43,24 @@ class GameService:
         Returns:
             Tuple of (Game object, is_new: bool)
         """
+        # Natural key from ESPN. If absent the lookup below matches nothing and a new row is
+        # attempted, which will fail on the NOT NULL constraint.
         game_id = game_data.get("game_id")
 
         # Check if game already exists
+        # Lookup by external id (indexed, unique) to decide between update and insert.
         existing_game = db.query(Game).filter(Game.game_id == game_id).first()
 
         if existing_game:
             # Update existing game
             for key, value in game_data.items():
+                # Copy only keys that are real model attributes so stray dict keys are ignored
+                # rather than creating arbitrary attributes.
                 if hasattr(existing_game, key):
                     setattr(existing_game, key, value)
 
+            # Set explicitly in addition to the column's onupdate so the timestamp changes
+            # even when no value actually differs.
             existing_game.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(existing_game)
@@ -58,6 +70,8 @@ class GameService:
 
         else:
             # Create new game
+            # Unlike the update path, this raises TypeError if game_data has keys that are not
+            # columns; callers are expected to pass only known fields.
             new_game = Game(**game_data)
             db.add(new_game)
             db.commit()
@@ -67,11 +81,13 @@ class GameService:
             return new_game, True
 
     @staticmethod
+    # Return the single game with this external id, or None.
     def get_game_by_id(db: Session, game_id: str) -> Optional[Game]:
         """Get a game by its game_id"""
         return db.query(Game).filter(Game.game_id == game_id).first()
 
     @staticmethod
+    # Newest-first games for a league, optionally skipping finished ones. Limit is applied in SQL.
     def get_games_by_league(
         db: Session,
         league: str,
@@ -93,6 +109,8 @@ class GameService:
         query = db.query(Game).filter(Game.league == league)
 
         if not include_final:
+            # '== False' is intentional SQLAlchemy syntax that builds a SQL expression
+            # (a Python 'not' or 'is False' would not work here).
             query = query.filter(Game.is_final == False)
 
         games = query.order_by(Game.date.desc()).limit(limit).all()
@@ -101,6 +119,8 @@ class GameService:
         return games
 
     @staticmethod
+    # Games dated within the last N days (UTC), newest first.
+    # Note the date column holds kickoff time, so future games also match.
     def get_recent_games(
         db: Session,
         days: int = 7,
@@ -131,6 +151,9 @@ class GameService:
         return games
 
     @staticmethod
+    # Case-insensitive substring match on either the home or the away team name.
+    # The '|' operator is SQLAlchemy's OR; the user-supplied text is bound as a parameter by
+    # SQLAlchemy, but '%' and '_' inside it still act as LIKE wildcards.
     def get_games_by_team(
         db: Session,
         team_name: str,
@@ -162,6 +185,8 @@ class GameService:
         return games
 
     @staticmethod
+    # Bulk-delete games older than N days and return the number of rows removed.
+    # Query.delete() runs a single SQL DELETE without loading objects; the commit makes it permanent.
     def delete_old_games(db: Session, days: int = 30) -> int:
         """
         Delete games older than N days
@@ -187,6 +212,7 @@ class GameService:
         return deleted
 
     @staticmethod
+    # Total number of games, optionally restricted to one league.
     def get_game_count(db: Session, league: Optional[str] = None) -> int:
         """
         Get total number of games
@@ -200,6 +226,7 @@ class GameService:
         """
         query = db.query(Game)
 
+        # Each optional argument narrows the query only when provided.
         if league:
             query = query.filter(Game.league == league)
 
@@ -207,6 +234,11 @@ class GameService:
         return count
 
     @staticmethod
+    # Flexible search used by the filter endpoint.
+    # Column filters (league, status, dates, venue, teams) run in SQL. Score-based filters and
+    # sorting run in Python after loading all matches, because they depend on computed values
+    # (home + away, difference). The limit is therefore applied last, so large tables load
+    # fully into memory first.
     def get_filtered_games(
         db: Session,
         league: Optional[str] = None,
@@ -253,6 +285,7 @@ class GameService:
         if league:
             query = query.filter(Game.league == league)
 
+        # Status and name filters use case-insensitive substring matching (ILIKE).
         if status:
             query = query.filter(Game.status.ilike(f"%{status}%"))
 
@@ -275,6 +308,7 @@ class GameService:
             query = query.filter(Game.away_team.ilike(f"%{away_team}%"))
 
         # Score-based filters (need to be applied to results after query)
+        # Materialise results so computed-score filters can run in Python.
         games = query.all()
 
         if min_score is not None:
@@ -287,6 +321,8 @@ class GameService:
             games = [g for g in games if abs(g.home_score - g.away_score) <= close_game_threshold]
 
         # Sort
+        # Unknown sort_by values fall through to the date ordering at the bottom of this chain.
+        # 'reverse=not ascending' means the default (ascending=False) is descending.
         if sort_by == "home_score":
             games = sorted(games, key=lambda g: g.home_score, reverse=not ascending)
         elif sort_by == "away_score":
@@ -299,9 +335,12 @@ class GameService:
             games = sorted(games, key=lambda g: g.date, reverse=not ascending)
 
         logger.info(f"Retrieved {len(games[:limit])} filtered games")
+        # Slice after filtering and sorting so the limit applies to the final ordering.
         return games[:limit]
 
     @staticmethod
+    # Finished games whose combined score meets the threshold, highest first.
+    # Thresholds are sport-specific (100 suits basketball, not hockey).
     def get_high_scoring_games(
         db: Session,
         threshold: int = 100,
@@ -333,6 +372,7 @@ class GameService:
         return high_scoring[:limit]
 
     @staticmethod
+    # Finished games decided by at most max_diff points, closest first.
     def get_close_games(
         db: Session,
         max_diff: int = 5,
@@ -364,6 +404,7 @@ class GameService:
         return close_games[:limit]
 
     @staticmethod
+    # Substring (case-insensitive) match on the status text, newest first.
     def get_games_by_status(
         db: Session,
         status_filter: str,
@@ -393,6 +434,8 @@ class GameService:
         return games
 
     @staticmethod
+    # Return a {label: count} dictionary grouped by league, status, final/live or day.
+    # Unrecognised group_by values return an empty dictionary.
     def get_aggregate_stats(
         db: Session,
         group_by: str = "league"
@@ -410,6 +453,7 @@ class GameService:
         stats = {}
 
         if group_by == "league":
+            # Imported locally because only the aggregate queries need it.
             from sqlalchemy import func
             results = (
                 db.query(Game.league, func.count(Game.id))
@@ -428,6 +472,7 @@ class GameService:
             stats = {status: count for status, count in results}
 
         elif group_by == "final":
+            # Split into finished versus not-finished games.
             final_count = db.query(Game).filter(Game.is_final == True).count()
             live_count = db.query(Game).filter(Game.is_final == False).count()
             stats = {"final": final_count, "live": live_count}
@@ -435,6 +480,8 @@ class GameService:
         elif group_by == "date":
             # Group by date (last 7 days)
             from sqlalchemy import func
+            # Fixed seven-day window; func.date truncates the timestamp to a calendar day
+            # (behaviour of func.date depends on the database backend).
             cutoff = datetime.utcnow() - timedelta(days=7)
             results = (
                 db.query(
@@ -453,4 +500,5 @@ class GameService:
 
 
 # Singleton instance
+# Module-level singleton used by the API routes.
 game_service = GameService()
