@@ -46,16 +46,10 @@ public class CryptoService : BackgroundService
     // Crypto data storage
     // Snapshots keyed by their timestamp text, held in memory only (lost on restart, never trimmed).
     private readonly ConcurrentDictionary<string, CryptoSnapshot> _cryptoSnapshots;
-    // Rolling window of the most recent trades. List is not thread-safe, so all access
-    // is guarded by _tradesLock. Nothing in this service reads it back yet.
-    private readonly List<CryptoTrade> _recentTrades;
-    private readonly object _tradesLock = new object();
 
     // Configuration
-    // Interval between snapshots, cap on buffered trades, and the delay before reconnecting
-    // after a dropped connection.
+    // Interval between snapshots and the delay before reconnecting after a dropped connection.
     private const int SNAPSHOT_INTERVAL_MINUTES = 10;
-    private const int MAX_TRADES_BUFFER = 1000;
     private const int RECONNECT_DELAY_MS = 5000;
 
     // Current price tracking
@@ -76,7 +70,6 @@ public class CryptoService : BackgroundService
         _logger = logger;
         _stopwatch = new Stopwatch();
         _cryptoSnapshots = new ConcurrentDictionary<string, CryptoSnapshot>();
-        _recentTrades = new List<CryptoTrade>();
     }
 
     // Step 1: Main background daemon lifecycle management loop
@@ -133,7 +126,7 @@ public class CryptoService : BackgroundService
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
                     var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    ProcessTradeMessage(message);
+                    await ProcessTradeMessageAsync(message);
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
                 {
@@ -176,9 +169,9 @@ public class CryptoService : BackgroundService
     }
 
     // Step 4: Parse incoming JSON payload and update rolling price statistics
-    // Parse one Binance trade JSON message and update price, extrema and the trade buffer.
+    // Parse one Binance trade JSON message and update price and extrema.
     // Exceptions are caught per message so a bad payload cannot stop the stream.
-    private void ProcessTradeMessage(string message)
+    private async Task ProcessTradeMessageAsync(string message)
     {
         try
         {
@@ -198,30 +191,10 @@ public class CryptoService : BackgroundService
                 if (_currentPrice < _lowPrice)
                     _lowPrice = _currentPrice;
 
-                // Store recent trade
-                // Guard the shared list. Trade time T is milliseconds since the Unix epoch.
-                lock (_tradesLock)
-                {
-                    _recentTrades.Add(new CryptoTrade
-                    {
-                        Symbol = trade.s,
-                        Price = _currentPrice,
-                        Quantity = decimal.Parse(trade.q),
-                        Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(trade.T).UtcDateTime
-                    });
-
-                    // Keep buffer size manageable
-                    if (_recentTrades.Count > MAX_TRADES_BUFFER)
-                    {
-                        // Drop the oldest entry (O(n) on a List, acceptable for a 1000-item buffer).
-                        _recentTrades.RemoveAt(0);
-                    }
-                }
-
                 // Broadcast current price to clients
-                // Blocks the receive loop until the SignalR send finishes (sync-over-async). Simple and
-                // preserves order, but a slow client path would throttle ingestion.
-                BroadcastCurrentPriceAsync(_currentPrice).Wait();
+                // Awaited (not .Wait()) so the receive loop yields its thread while the SignalR send
+                // is in flight; order is still preserved because the next ReceiveAsync only runs after.
+                await BroadcastCurrentPriceAsync(_currentPrice);
             }
         }
         catch (Exception ex)
@@ -239,7 +212,7 @@ public class CryptoService : BackgroundService
 
             if (_isRunning)
             {
-                TakeSnapshot();
+                await TakeSnapshotAsync();
             }
         }
     }
@@ -247,7 +220,7 @@ public class CryptoService : BackgroundService
     // Step 5: Capture periodic 10-minute historical snapshot with timestamped record
     // Record the current state as a CryptoSnapshot, then restart the high/low window from the
     // current price so each snapshot covers only its own interval.
-    private void TakeSnapshot()
+    private async Task TakeSnapshotAsync()
     {
         var now = DateTime.UtcNow;
         var snapshot = new CryptoSnapshot
@@ -278,7 +251,7 @@ public class CryptoService : BackgroundService
         _lastSnapshotTime = now;
 
         // Broadcast snapshot to clients
-        BroadcastSnapshotAsync(snapshot).Wait();
+        await BroadcastSnapshotAsync(snapshot);
     }
 
     // Push the latest price to all dashboards as "ReceiveCryptoPrice"; errors are logged, never thrown.
