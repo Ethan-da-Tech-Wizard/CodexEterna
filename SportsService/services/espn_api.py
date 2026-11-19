@@ -8,11 +8,13 @@
 """
 ESPN API Service - Fetches sports data from ESPN's unofficial API
 """
+# Third-party HTTP client (requests) plus typing helpers and datetime for kickoff times.
 import requests
 from typing import List, Dict, Optional
 from datetime import datetime
 import logging
 
+# Module-level logging setup; note this configures the root logger at import time.
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -22,9 +24,13 @@ class ESPNAPIService:
     Service for fetching sports data from ESPN API
     """
 
+    # Root of ESPN's unofficial public site API. It is undocumented and may change without notice.
     BASE_URL = "https://site.api.espn.com/apis/site/v2/sports"
 
     # Sport mappings
+    # Whitelist mapping a public league key ('sport/league') to the (sport, league_code)
+    # path segments used in ESPN URLs. Keys outside this dict are rejected, which also
+    # prevents arbitrary path injection into the request URL.
     SPORT_MAPPINGS = {
         "football/nfl": ("football", "nfl"),
         "basketball/nba": ("basketball", "nba"),
@@ -34,6 +40,8 @@ class ESPNAPIService:
         "basketball/wnba": ("basketball", "wnba"),
     }
 
+    # Create one reusable HTTP session (connection pooling) with a browser-like User-Agent,
+    # since ESPN may reject the default python-requests agent.
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
@@ -51,6 +59,7 @@ class ESPNAPIService:
         Returns:
             List of game dictionaries
         """
+        # Reject unknown leagues before building a URL.
         if league not in self.SPORT_MAPPINGS:
             raise ValueError(f"Unsupported league: {league}")
 
@@ -60,6 +69,8 @@ class ESPNAPIService:
         logger.info(f"Fetching scoreboard from: {url}")
 
         try:
+            # 10 second timeout so a stalled upstream cannot hang the caller indefinitely.
+            # raise_for_status turns 4xx/5xx into exceptions handled below.
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
             data = response.json()
@@ -69,6 +80,7 @@ class ESPNAPIService:
 
             return games
 
+        # Log and re-raise so the API layer can translate the failure into an HTTP error.
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching scoreboard: {e}")
             raise
@@ -88,6 +100,7 @@ class ESPNAPIService:
         """
         games = []
 
+        # 'events' holds one entry per game; default to an empty list if the key is missing.
         events = data.get("events", [])
 
         for event in events:
@@ -95,12 +108,15 @@ class ESPNAPIService:
                 game = self._parse_event(event, league, sport)
                 if game:
                     games.append(game)
+            # One malformed event must not discard the rest of the scoreboard: log and skip it.
             except Exception as e:
                 logger.warning(f"Error parsing event: {e}")
                 continue
 
         return games
 
+    # Convert one ESPN event into this service's flat game dict.
+    # Returns None for events lacking competitions or at least two competitors.
     def _parse_event(self, event: Dict, league: str, sport: str) -> Optional[Dict]:
         """
         Parse a single event/game from ESPN API
@@ -121,6 +137,8 @@ class ESPNAPIService:
 
             # Extract date
             date_str = event.get("date")
+            # ESPN sends ISO-8601 with a trailing 'Z'; fromisoformat before Python 3.11 rejects 'Z',
+            # so it is rewritten to an explicit +00:00 offset. Falls back to now (naive UTC) if missing.
             game_date = datetime.fromisoformat(date_str.replace("Z", "+00:00")) if date_str else datetime.utcnow()
 
             # Extract venue
@@ -128,6 +146,7 @@ class ESPNAPIService:
             if not competitions:
                 return None
 
+            # Only the first competition is used; regular games have exactly one.
             competition = competitions[0]
             venue = competition.get("venue", {}).get("fullName", "")
 
@@ -141,9 +160,12 @@ class ESPNAPIService:
             home_team = None
             away_team = None
 
+            # Assign each side by the explicit 'homeAway' field rather than by list position.
             for competitor in competitors:
                 team_info = competitor.get("team", {})
                 team_name = team_info.get("displayName", "Unknown")
+                # Scores arrive as strings; int() raises on non-numeric values, which the outer
+                # try/except converts into a skipped event.
                 score = int(competitor.get("score", 0))
                 is_home = competitor.get("homeAway") == "home"
 
@@ -152,6 +174,7 @@ class ESPNAPIService:
                 else:
                     away_team = {"name": team_name, "score": score}
 
+            # Happens when 'homeAway' is absent or both teams share a value (e.g. neutral-site games).
             if not home_team or not away_team:
                 # Fallback: assume first is home, second is away
                 home_team = {
@@ -164,6 +187,7 @@ class ESPNAPIService:
                 }
 
             # Determine if game is final
+            # ESPN status descriptions that mean the game is over (including overtime/shootout).
             is_final = status_type.lower() in ["final", "final/ot", "final/so"]
 
             # Build game dictionary
@@ -187,6 +211,9 @@ class ESPNAPIService:
             logger.error(f"Error parsing event: {e}")
             return None
 
+    # Fetch raw standings JSON for a league. Unlike fetch_scoreboard this does not
+    # normalise the response and returns ESPN's payload unchanged (a dict, despite the
+    # List[Dict] annotation).
     def fetch_team_standings(self, league: str) -> List[Dict]:
         """
         Fetch team standings for a league
@@ -222,4 +249,5 @@ class ESPNAPIService:
 
 
 # Singleton instance
+# Module-level singleton so all callers share one HTTP session.
 espn_api = ESPNAPIService()

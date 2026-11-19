@@ -1,18 +1,25 @@
 services:
   # PostgreSQL Database for Sports Data
   sportsdb:
+    # Pinned major version (15) on Alpine keeps the image small and upgrades predictable.
     image: postgres:15-alpine
     container_name: sportsdb
     environment:
+      # SECURITY NOTE: the database password is hard-coded as 'secret' (also in DATABASE_URL below
+      # and as the fallback in models/database.py). Acceptable for local development only; use
+      # env files or secrets for anything shared.
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: sportsdata
     volumes:
+      # Named volume so database contents survive container recreation.
       - sportsdb_data:/var/lib/postgresql/data
     ports:
+      # Publishes Postgres on the host for local tools; remove to keep it internal to the network.
       - "5432:5432"
     networks:
       - data-pipeline-network
+    # pg_isready makes dependents wait until the database actually accepts connections.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -23,21 +30,26 @@ services:
   # Python Sports Data Service
   sportsservice:
     build:
+      # Build context is the service directory; the Dockerfile there installs requirements.txt.
       context: ./SportsService
       dockerfile: Dockerfile
     container_name: sportsservice
     environment:
+      # Host 'sportsdb' resolves through the compose network by service name.
       DATABASE_URL: postgresql://postgres:secret@sportsdb:5432/sportsdata
       PYTHONUNBUFFERED: 1
     ports:
       - "5001:5001"
     depends_on:
       sportsdb:
+        # Start only after the database healthcheck passes (plain depends_on would not wait).
         condition: service_healthy
     networks:
       - data-pipeline-network
     restart: unless-stopped
     volumes:
+      # Read-only bind mount overlays the image's /app with the local source, so edits show up
+      # without a rebuild. It is read-only, so the app cannot write files there.
       - ./SportsService:/app:ro
 
   # C# Coordinate Ping Service
@@ -47,6 +59,7 @@ services:
       dockerfile: Dockerfile
     container_name: pingservice
     environment:
+      # Standard ASP.NET Core settings: run in Production mode and listen on plain HTTP port 5000.
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:5000
     ports:
@@ -55,10 +68,12 @@ services:
       - data-pipeline-network
     restart: unless-stopped
     depends_on:
+      # Start order only (no health condition): PingService does not wait for the sports API to be ready.
       - sportsservice
 
 networks:
   data-pipeline-network:
+    # Single user-defined bridge network shared by all three services.
     driver: bridge
     name: data-pipeline-network
 
