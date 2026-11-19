@@ -1,3 +1,7 @@
+/* File role: the single stylesheet for PingService/wwwroot/index.html. Design system: every colour, spacing step, font and timing is a CSS custom property */
+/* on :root below, and dashboard.js changes the look at runtime only by rewriting those properties (applyPreset, applyCustomGradient, updateOpacity), never by editing rules. */
+/* State classes toggled by JavaScript: .active (tabs, panels, settings drawer), .running / .paused (status dot), .updated (stat flash), .blur-disabled and .animations-disabled on <body>. */
+
 /* ==============================================================================
  * Program: dashboard.css
  * Programmer: Ethan-da-Tech-Wizard
@@ -17,6 +21,7 @@
 
 :root {
     /* Executive Dark Theme (Default) */
+    /* Defaults here match the "executive-dark" preset in dashboard.js, so the first paint before any script runs already looks right. */
     --bg-color-1: #1a1d29;
     --bg-color-2: #0f1117;
     --bg-gradient-angle: 135deg;
@@ -29,6 +34,7 @@
     --info-color: #7986cb;
 
     /* Surface Colors */
+    /* Surface colours are rgba (not hex) so opacity can be changed by the transparency slider; dashboard.js recomputes these three from the background colour. */
     --panel-bg: rgba(26, 29, 41, 0.95);
     --card-bg: rgba(40, 44, 60, 0.8);
     --darker-bg: rgba(15, 17, 23, 0.95);
@@ -41,6 +47,8 @@
     /* Border & Effects */
     --border-color: rgba(91, 155, 213, 0.2);
     --shadow-color: rgba(0, 0, 0, 0.3);
+
+    /* Used by backdrop-filter on glass panels. The .blur-disabled class sets it to 0 for slow GPUs. */
     --blur-amount: 10px;
 
     /* Spacing */
@@ -56,6 +64,8 @@
 
     /* Animation */
     --transition-speed: 0.25s;
+
+    /* Informational flag only; the .animations-disabled rule at the bottom is what actually stops animation and transitions. */
     --animation-enabled: 1;
 }
 
@@ -63,6 +73,7 @@
    Base Styles
    ============================================================================ */
 
+/* Universal reset plus border-box so padding never changes an element's declared width, which keeps the grid math below predictable. */
 * {
     margin: 0;
     padding: 0;
@@ -73,6 +84,7 @@ html {
     scroll-behavior: smooth;
 }
 
+/* background-attachment: fixed keeps the gradient still while the long page scrolls. overflow-x hidden stops the off-screen settings drawer from creating a horizontal scrollbar. */
 body {
     font-family: var(--font-primary);
     background: linear-gradient(
@@ -92,6 +104,7 @@ body {
    Floating Settings Button
    ============================================================================ */
 
+/* z-index 1000 sits above the drawer (999) so the button is still clickable when the drawer is open. */
 .settings-btn {
     position: fixed;
     top: 20px;
@@ -125,6 +138,7 @@ body {
    Settings Panel
    ============================================================================ */
 
+/* Parked off-screen with right: -450px (wider than its 400px width, so the shadow is hidden too) and slid in by transitioning `right`. */
 .settings-panel {
     position: fixed;
     top: 0;
@@ -140,6 +154,7 @@ body {
     box-shadow: -10px 0 30px var(--shadow-color);
 }
 
+/* Toggled by toggleSettings() in dashboard.js. */
 .settings-panel.active {
     right: 0;
 }
@@ -432,6 +447,7 @@ body {
     position: relative;
 }
 
+/* Panels are hidden with display none; only the one with .active is shown, and it fades in with the fadeIn animation each time. */
 .tab-panel {
     display: none;
     animation: fadeIn 0.3s ease-in-out;
@@ -492,6 +508,7 @@ body {
     border: 1px solid var(--border-color);
 }
 
+/* Grey by default; JavaScript adds .running (green) or .paused (amber, pulse stopped) so state is visible without reading text. */
 .status-dot {
     width: 10px;
     height: 10px;
@@ -520,6 +537,7 @@ body {
    Stats Grid
    ============================================================================ */
 
+/* auto-fit with a 150px minimum puts as many stat cards per row as fit and wraps naturally on narrow screens. */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -552,6 +570,7 @@ body {
     font-weight: 600;
 }
 
+/* Monospace and tabular-nums keep digits the same width, so a rapidly changing number does not jitter sideways. */
 .stat-value {
     font-size: 1.8rem;
     font-weight: 700;
@@ -560,6 +579,7 @@ body {
     font-family: var(--font-mono);
 }
 
+/* The class is added for 500 ms by updateStatValue in dashboard.js to flash the number when it changes. */
 .stat-value.updated {
     animation: highlight 0.5s ease-in-out;
 }
@@ -573,6 +593,7 @@ body {
    Controls & Buttons
    ============================================================================ */
 
+/* flex-wrap lets the button row wrap instead of overflowing on narrow screens. */
 .controls {
     display: flex;
     gap: var(--spacing-sm);
@@ -730,6 +751,7 @@ body {
    Table Container
    ============================================================================ */
 
+/* Fixed max-height with scroll keeps the 1000-row table from stretching the page; the header below is sticky so column names stay visible while scrolling. */
 .table-container {
     max-height: 600px;
     overflow-y: auto;
@@ -743,6 +765,7 @@ body {
     border-collapse: collapse;
 }
 
+/* position: sticky needs the scroll container (.table-container) as its ancestor; z-index 10 keeps rows from sliding over the header. */
 .data-table thead {
     position: sticky;
     top: 0;
@@ -837,6 +860,7 @@ body {
     text-align: center;
 }
 
+/* Shared by the sports and crypto result lists; both templates in dashboard.js use the same game-card / game-teams / game-status classes. */
 .game-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -956,6 +980,7 @@ body {
    Responsive Design
    ============================================================================ */
 
+/* Phone layout: the settings drawer takes the full width, stat cards go to two columns, and button rows stack vertically. */
 @media (max-width: 768px) {
     .settings-panel {
         width: 100%;
@@ -992,6 +1017,7 @@ body {
    Utility Classes
    ============================================================================ */
 
+/* !important is needed because these rules must beat the inline custom-property values dashboard.js sets on <html>. */
 .blur-disabled {
     --blur-amount: 0px !important;
 }
@@ -1007,6 +1033,7 @@ body {
     --animation-enabled: 0 !important;
 }
 
+/* Universal selector so every element stops animating; used for users who find motion distracting or have slow machines. */
 .animations-disabled * {
     transition: none !important;
     animation: none !important;
