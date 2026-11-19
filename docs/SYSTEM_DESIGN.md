@@ -408,7 +408,7 @@ This system adheres to all 12 factors:
 ### 12. Admin Processes
 ✅ Run admin tasks as one-off processes
 - Database migrations: `docker-compose run sportsservice python init_db.py`
-- Cleanup old data: `curl -X DELETE http://localhost:5001/api/sports/cleanup?days=30`
+- Cleanup old data: `curl -X DELETE -H "X-API-Key: $ADMIN_API_KEY" "http://localhost:5001/api/sports/cleanup?days=30"`
 - No SSH into containers; use same images for admin tasks
 
 ## Scalability Strategy

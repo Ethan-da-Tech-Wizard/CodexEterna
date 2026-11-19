@@ -10,7 +10,7 @@ Sports Data Service - FastAPI Application
 Fetches and stores sports data from ESPN API
 """
 # FastAPI framework pieces: routing, dependency injection, HTTP errors and query validation.
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -19,6 +19,7 @@ import logging
 
 # Absolute imports (models., services.) rely on /app being the working directory
 # and on sys.path, as in the Docker image (`uvicorn app.main:app` run from /app).
+from models.config import admin_key_configured, get_cors_origins, is_valid_admin_key
 from models.database import get_db, init_db, engine
 from models.schemas import (
     GameResponse,
@@ -44,15 +45,31 @@ app = FastAPI(
 )
 
 # Add CORS middleware
-# SECURITY NOTE: origins/methods/headers are all '*' while credentials are allowed.
-# That is convenient for local development but too permissive for a public deployment.
+# Only the origins listed in CORS_ALLOWED_ORIGINS (default: the local PingService dashboard on
+# http://localhost:5000) may call this API from a browser. Methods and headers are limited to
+# what the API uses. The wildcard '*' is refused by get_cors_origins because it must never be
+# combined with credentials. CORS is a browser-side control only: it does not stop curl.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "DELETE", "OPTIONS"],
+    allow_headers=["X-API-Key", "Content-Type"],
 )
+
+
+# FastAPI dependency guarding destructive routes. Clients must send the secret configured in
+# ADMIN_API_KEY in an 'X-API-Key' header. If no key is configured the route is disabled (503)
+# rather than left open; a wrong or missing key gives 401.
+def require_admin_key(x_api_key: Optional[str] = Header(None)) -> None:
+    """Reject the request unless it carries the correct X-API-Key header."""
+    if not admin_key_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Destructive operations are disabled: set ADMIN_API_KEY to enable them",
+        )
+    if not is_valid_admin_key(x_api_key):
+        raise HTTPException(status_code=401, detail="Missing or invalid X-API-Key")
 
 
 # Step 1: Initialize database schema and verify table availability on startup
@@ -456,11 +473,12 @@ async def get_supported_leagues():
 
 
 @app.delete("/api/sports/cleanup")
-# Delete games older than N days (1-365). SECURITY NOTE: destructive and has no
-# authentication, so it should not be exposed publicly as-is.
+# Delete games older than N days (1-365). Destructive, so it requires the X-API-Key header
+# matching ADMIN_API_KEY (see require_admin_key); without a configured key it returns 503.
 async def cleanup_old_games(
     days: int = Query(30, ge=1, le=365, description="Delete games older than N days"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: None = Depends(require_admin_key)
 ):
     """
     Delete old games from database
